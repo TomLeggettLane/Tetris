@@ -203,12 +203,19 @@ typedef struct {
 } CubeVisualDesign;
 
 typedef struct {
-	float x;
-	float y;
+	int x;
+	int y;
 	short* rotations;
 	int currentRotation;
 	int shapeType;
 } Tetromino;
+
+typedef struct {
+	int* cells;
+	int numTotalRows;
+	int numGameRows;
+	int numGameCols;
+} Gameboard;
 
 CubeVisualDesign HollowCubeDesign = {
 	.outerRect = { 0,0, PIXEL_SIZE - 2 * MARGIN, PIXEL_SIZE - 2 * MARGIN },
@@ -229,8 +236,18 @@ CubeVisualDesign ColouredCubeDesign = {
 	.RGBspecularRect = {255, 255, 255 }
 };
 
+typedef struct {
+	Tetromino currentShape;
+	Tetromino nextShape;
+	Gameboard gameboard;
+	int score;
+	int currentLevel;
+	int tetrisRows[4];
+	double timeToMove;
+} Game;
 
 /* ~ ~ ~ ~ ~ ~ ~ ~ DRAW METHODS ~ ~ ~ ~ ~ ~ ~ ~ */
+
 void drawLetter(SDL_Renderer* renderer, int x, int y, char letterToDraw) {
 	SDL_SetRenderDrawColor(renderer, 255, 255, 255, SDL_ALPHA_OPAQUE);
 
@@ -324,39 +341,59 @@ void drawStats(SDL_Renderer* renderer, Tetromino* nextShape) {
 	return;
 }
 
-void draw(SDL_Renderer* renderer, int gameboard[], Tetromino* currentShape, Tetromino* nextShape, int score, int currentLevel) {
+void drawCurrentShape(SDL_Renderer* renderer, Tetromino* currentShape) {
+	int screenX = currentShape->x * PIXEL_SIZE;
+	int screenY = currentShape->y * PIXEL_SIZE;
+	drawShape(renderer, currentShape, screenX, screenY);
+}
+
+void drawNextShape(SDL_Renderer* renderer, Tetromino* nextShape) {
+	int previewXpos = 123;
+	int previewYpos = 415;
+
+	//Centers nextShape in the 'preview next shape' box;
+	if (nextShape->shapeType == 0) {
+		previewXpos -= PIXEL_SIZE / 2;
+	}
+	else if (nextShape->shapeType == 1) {
+		previewXpos -= PIXEL_SIZE / 2;
+		previewYpos += PIXEL_SIZE / 2;
+	}
+
+	drawShape(renderer, nextShape, previewXpos, previewYpos);
+}
+
+void draw(SDL_Renderer* renderer, Gameboard* gameboard, Tetromino* currentShape, Tetromino* nextShape, int score, int currentLevel) {
 	drawStats(renderer, nextShape);
 	drawBoard(renderer, gameboard);
-	drawShape(renderer, currentShape);
-	drawShape(renderer, nextShape);
+	drawCurrentShape(renderer, currentShape);
+	drawNextShape(renderer, nextShape);
 	drawScore(renderer, score);
 	drawLevel(renderer, currentLevel);
 	SDL_RenderPresent(renderer);
 }
 
-int drawShape(SDL_Renderer* renderer, Tetromino *currentShape) {
-	float x = currentShape->x;
-	float y = currentShape->y;
+int drawShape(SDL_Renderer* renderer, Tetromino *currentShape, int screenX, int screenY) {
 	short bitmap = currentShape->rotations[currentShape->currentRotation];
 
 	unsigned short bitmask = 0b1000000000000000;
 	for (int i = 0; i < 4; i++) {
 		for (int j = 0; j < 4; j++) {
 			if (bitmask & bitmap) {
-				HollowCubeDesign.outerRect.x = (x + j) * PIXEL_SIZE + MARGIN;
-				HollowCubeDesign.outerRect.y = (y + i) * PIXEL_SIZE + MARGIN;
+				HollowCubeDesign.outerRect.x = screenX + j * PIXEL_SIZE + MARGIN;
+				HollowCubeDesign.outerRect.y = screenY + i * PIXEL_SIZE + MARGIN;
 				SDL_SetRenderDrawColor(renderer, HollowCubeDesign.RGBouterRect[0], HollowCubeDesign.RGBouterRect[1], HollowCubeDesign.RGBouterRect[2], SDL_ALPHA_OPAQUE);
 				SDL_RenderDrawRect(renderer, &HollowCubeDesign.outerRect);
 				SDL_RenderFillRect(renderer, &HollowCubeDesign.outerRect);
 
-				HollowCubeDesign.innerRect.x = (x + j) * PIXEL_SIZE + BORDER + MARGIN;
-				HollowCubeDesign.innerRect.y = (y + i) * PIXEL_SIZE + BORDER + MARGIN;
+				HollowCubeDesign.innerRect.x = screenX + j * PIXEL_SIZE + BORDER + MARGIN;
+				HollowCubeDesign.innerRect.y = screenY + i * PIXEL_SIZE + BORDER + MARGIN;
 				SDL_SetRenderDrawColor(renderer, HollowCubeDesign.RGBinnerRect[0], HollowCubeDesign.RGBinnerRect[1], HollowCubeDesign.RGBinnerRect[2], SDL_ALPHA_OPAQUE);
 				SDL_RenderDrawRect(renderer, &HollowCubeDesign.innerRect);
 				SDL_RenderFillRect(renderer, &HollowCubeDesign.innerRect);
 				
-				HollowCubeDesign.specularRect.x = (x + j) * PIXEL_SIZE + MARGIN;
-				HollowCubeDesign.specularRect.y = (y + i) * PIXEL_SIZE + MARGIN;
+				HollowCubeDesign.specularRect.x = screenX + j * PIXEL_SIZE + MARGIN;
+				HollowCubeDesign.specularRect.y = screenY + i * PIXEL_SIZE + MARGIN;
 				SDL_SetRenderDrawColor(renderer, HollowCubeDesign.RGBspecularRect[0], HollowCubeDesign.RGBspecularRect[1], HollowCubeDesign.RGBspecularRect[2], SDL_ALPHA_OPAQUE);
 				SDL_RenderDrawRect(renderer, &HollowCubeDesign.specularRect);
 				SDL_RenderFillRect(renderer, &HollowCubeDesign.specularRect);
@@ -367,11 +404,11 @@ int drawShape(SDL_Renderer* renderer, Tetromino *currentShape) {
 	return 1;
 }
 
-int drawBoard(SDL_Renderer* renderer, int gameboard[]) {
-	for (int i = 0; i < ROWS; i++) {
+int drawBoard(SDL_Renderer* renderer, Gameboard* gameboard) {
+	for (int i = 0; i < gameboard->numGameRows; i++) {
 		unsigned short bitmask = 0b1000000000;
-		for (int j = 0; j < COLS; j++) {
-			if (bitmask & gameboard[i + HIDDEN_ROWS]) {
+		for (int j = 0; j < gameboard->numGameCols; j++) {
+			if (bitmask & gameboard->cells[i + HIDDEN_ROWS]) {
 				ColouredCubeDesign.outerRect.x = j * PIXEL_SIZE + MARGIN;
 				ColouredCubeDesign.outerRect.y = i * PIXEL_SIZE + MARGIN;
 				SDL_SetRenderDrawColor(renderer, ColouredCubeDesign.RGBouterRect[0], ColouredCubeDesign.RGBouterRect[1], ColouredCubeDesign.RGBouterRect[2], SDL_ALPHA_OPAQUE);
@@ -399,18 +436,15 @@ int drawBoard(SDL_Renderer* renderer, int gameboard[]) {
 		}
 	}
 	return 1;
-
 }
 
-int clear(SDL_Renderer* renderer, int tetrisRows[4]) {
+int clear(SDL_Renderer* renderer) {
 	SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
 	SDL_RenderClear(renderer);
 	return 1;
 }
 
-
 /* ~ ~ ~ ~ ~ ~ ~ ~ UPDATE METHODS ~ ~ ~ ~ ~ ~ ~ ~ */
-
 
 void setNextShape(Tetromino* nextShape) {
 	int previousShapeType = nextShape->shapeType;
@@ -422,18 +456,8 @@ void setNextShape(Tetromino* nextShape) {
 	nextShape->shapeType = newShapeType;
 	nextShape->currentRotation = 0;
 	nextShape->rotations = shapeRotations[nextShape->shapeType];
-
-	nextShape->x = 6.15;
-	nextShape->y = 20.75;
-
-	//Centers nextShape in the 'preview next shape' box;
-	if (nextShape->shapeType == 0) {
-		nextShape->x -= 0.5;
-	}
-	else if (nextShape->shapeType == 1) {
-		nextShape->x -= 0.5;
-		nextShape->y += 0.5;
-	}
+	nextShape->x = 3;
+	nextShape->y = 0;
 }
 
 void updateCurrentShape(Tetromino* currentShape, Tetromino* nextShape) {
@@ -456,6 +480,7 @@ void initNewShape(Tetromino* currentShape, Tetromino* nextShape) {
 
 	//increases currentShape.y until tetromino is at the top of the board, because some meshes have empty first&second rows
 	unsigned short bitmask = 0b1111000000000000;
+
 	while ((currentShape->rotations[currentShape->currentRotation] & bitmask) == 0) {
 		currentShape->y--;
 		bitmask = bitmask >> 4;
@@ -463,25 +488,55 @@ void initNewShape(Tetromino* currentShape, Tetromino* nextShape) {
 	return;
 }
 
-void initGameboard(int gameboard[ROWS + HIDDEN_ROWS]) {
-	for (int i = 0; i < (ROWS + HIDDEN_ROWS) + 1; i++) {
-		gameboard[i] = 0;
+void initGameboard(Gameboard* gameboard, int rows, int cols) {
+	int* cells = malloc(sizeof(int) * (rows + HIDDEN_ROWS));
+
+	gameboard->cells = cells;
+	gameboard->numGameRows = rows;
+	gameboard->numGameCols = cols;
+	gameboard->numTotalRows = gameboard->numGameRows + HIDDEN_ROWS;
+
+	for (int i = 0; i < gameboard->numTotalRows; i++) {
+		gameboard->cells[i] = 0;
 	}
 	return;
 }
 
-int updateTetrisRowsAndGameboard(int gameboard[TOTAL_ROWS], int tetrisRows[]) {
+Game* createGame(int numRows, int numCols) {
+	Game* game = malloc(sizeof(Game));
+
+	game->currentShape.shapeType = -1;    //initialize to -1 (no tetromino type defined yet)
+	game->nextShape.shapeType = -1; 
+	initNewShape(&game->currentShape, &game->nextShape);
+	initGameboard(&game->gameboard, numRows, numCols);
+	game->timeToMove = 0;
+
+	game->score = 0;
+	game->currentLevel = 1;
+	game->tetrisRows[0] = -1;    //updates elements to the row numbers if a row is full (ie tetris scored) otherwise -1
+	game->tetrisRows[1] = -1; 								   //users current score
+	game->tetrisRows[2] = -1;
+	game->tetrisRows[3] = -1;
+
+	return game;
+}
+
+void DeinitGameboard(Gameboard* gameboard) {
+	free(gameboard->cells);
+}
+
+int updateTetrisRowsAndGameboard(Gameboard* gameboard, int tetrisRows[]) {
 	int rows_index = 0;
 	int tempGameboard[TOTAL_ROWS];
 	int temp_ptr = TOTAL_ROWS - 1;
 
 	//add all full rows to tetrisRows, else add to tempGameboard
 	for (int i = temp_ptr; i >= HIDDEN_ROWS; i--) {
-		if (gameboard[i] == 0b1111111111) {
+		if (gameboard->cells[i] == 0b1111111111) {
 			tetrisRows[rows_index++] = i;
 		}
 		else {
-			tempGameboard[temp_ptr--] = gameboard[i];
+			tempGameboard[temp_ptr--] = gameboard->cells[i];
 		}
 	}
 
@@ -490,17 +545,17 @@ int updateTetrisRowsAndGameboard(int gameboard[TOTAL_ROWS], int tetrisRows[]) {
 	//update the new state of the gameboard with full rows removed
 	for (int i = TOTAL_ROWS - 1; i > -1; i--) {
 		if (i > temp_ptr) {
-			gameboard[i] = tempGameboard[i];
+			gameboard->cells[i] = tempGameboard[i];
 		}
 		else {
-			gameboard[i] = 0;
+			gameboard->cells[i] = 0;
 		}
 	}
 
 	return rows_index;
 }
 
-void copyShapeToBoard(Tetromino* currentShape, int gameboard[ROWS]) {
+void copyShapeToBoard(Tetromino* currentShape, Gameboard* gameboard) {
 	short currentRotation = currentShape->rotations[currentShape->currentRotation];
 	int x = currentShape->x;
 	int y = currentShape->y;
@@ -512,9 +567,9 @@ void copyShapeToBoard(Tetromino* currentShape, int gameboard[ROWS]) {
 	for (int i = 0; i < 4; i++) {
 		for (int j = 0; j < 4; j++) {
 			if (currentRotation & bitmask16) {
-				if ((y + i) < ROWS && (x + j) < COLS) {
-					short val = gameboard[HIDDEN_ROWS + y + i] | (bitmask10 >> (x + j));
-					gameboard[HIDDEN_ROWS + y + i] = val;
+				if ((y + i) < gameboard->numGameRows && (x + j) < gameboard->numGameCols) {
+					short val = gameboard->cells[HIDDEN_ROWS + y + i] | (bitmask10 >> (x + j));
+					gameboard->cells[HIDDEN_ROWS + y + i] = val;
 				}
 			}
 			bitmask16 = bitmask16 >> 1;
@@ -548,7 +603,7 @@ void updateLevel(int score, int* currentLevel) {
 	}
 }
 
-int isValidMove(Tetromino *currentShape, int gameboard[ROWS], char moveType) {
+int isValidMove(Tetromino *currentShape, Gameboard* gameboard, char moveType) {
 	int x = currentShape->x;
 	int y = currentShape->y;
 	short currentRotation = currentShape->rotations[currentShape->currentRotation];
@@ -571,11 +626,11 @@ int isValidMove(Tetromino *currentShape, int gameboard[ROWS], char moveType) {
 		for (int j = 0; j < 4; j++) {
 			if (currentRotation & bitmask16) {
 				//checks that the bounding box around the tetromino is within our board's bounds
-				if ((x + j) < 0 || (x + j) >= COLS || (y + i) < (-HIDDEN_ROWS) || (y + i) >= ROWS) {
+				if ((x + j) < 0 || (x + j) >= gameboard->numGameCols || (y + i) < (-HIDDEN_ROWS) || (y + i) >= gameboard->numGameRows) {
 					return 0;
 				}
 				////checks that the tetromino is not overlapping with tetromino's already on the board.
-				if (gameboard[HIDDEN_ROWS + y + i] & (bitmask10 >> (x + j))) {
+				if (gameboard->cells[HIDDEN_ROWS + y + i] & (bitmask10 >> (x + j))) {
 					return 0;
 				}
 			}
@@ -586,7 +641,23 @@ int isValidMove(Tetromino *currentShape, int gameboard[ROWS], char moveType) {
 	return 1;
 }
 
-int update(Tetromino* currentShape, Tetromino* nextShape, int gameboard[ROWS], int tetrisRows[4], int *score, int *currentLevel) {
+int update(Game* game, double timeElapsed) {
+	Tetromino* currentShape = &game->currentShape;
+	Tetromino* nextShape = &game->nextShape;
+	Gameboard* gameboard = &game->gameboard;
+	int* tetrisRows = game->tetrisRows;
+	int* score = &game->score;
+	int* currentLevel = &game->currentLevel;
+
+	game->timeToMove -= timeElapsed;
+	int incrementShapeY = game->timeToMove < 0.0;
+
+	if (!incrementShapeY) {
+		return 1;
+	}
+
+	game->timeToMove += 0.1 / ((game->currentLevel + 1) / 2);
+
 	if (isValidMove(currentShape, gameboard, 'D')) {
 		currentShape->y++;
 		return 1;
@@ -605,9 +676,9 @@ int update(Tetromino* currentShape, Tetromino* nextShape, int gameboard[ROWS], i
 	return checkEndGame(gameboard);
 }
 
-int checkEndGame(int gameboard[]) {
+int checkEndGame(Gameboard* gameboard) {
 	for (int i = 0; i < HIDDEN_ROWS; i++) {
-		if (gameboard[i]) {
+		if (gameboard->cells[i]) {
 			return 0;
 		}
 	}
@@ -651,27 +722,12 @@ SDL_Renderer* initGraphicsAndGetRenderer() {
 /* ~ ~ ~ ~ ~ ~ ~ ~ MAIN METHOD ~ ~ ~ ~ ~ ~ ~ ~ */
 
 int main(int argc, char* args[]) {
-	Tetromino currentShape;		//current tetromino we can control
-	Tetromino nextShape;	 //the next tetromino in the queue
-	currentShape.shapeType = -1;	//initialize to -1 (no tetromino type defined yet)
-	nextShape.shapeType = -1;
-
-	int gameboard[ROWS+HIDDEN_ROWS];	//tracks current state of the gameboard
-	initGameboard(gameboard);
-
-	int tetrisRows[4] = { -1,-1,-1,-1 };	//updates elements to the row numbers if a row is full (ie tetris scored) otherwise -1
-	int score = 0;		//users current score
-	int currentLevel = 1;
-
+	Game* game = createGame(ROWS, COLS);
 	SDL_Renderer* renderer = initGraphicsAndGetRenderer();
-	initNewShape(&currentShape, &nextShape);		//initializes currentShape and nextShape
 	srand(time(NULL));		//sets new seed for random number generator;
 
-	
-	clock_t start = clock();
-	clock_t end;
-	double timeElapsed = 0;
 	int playing = 1;
+	clock_t lastUpdate = clock();
 
 	while (playing) {
 		SDL_Event event;
@@ -682,38 +738,37 @@ int main(int argc, char* args[]) {
 			else if (event.type == SDL_KEYDOWN) {
 				switch (event.key.keysym.sym) {
 					case SDLK_ESCAPE: {playing = 0; break;}
-					case SDLK_a: { if(isValidMove(&currentShape, gameboard, 'L')) currentShape.x--; break;}
-					case SDLK_d: { if (isValidMove(&currentShape, gameboard, 'R')) currentShape.x++; break;}
-					case SDLK_s: { if (isValidMove(&currentShape, gameboard, 'D')) currentShape.y++; break;}
-					case SDLK_SPACE: { while(isValidMove(&currentShape, gameboard, 'D')) currentShape.y++; break;}
-					case SDLK_RIGHT: { if (isValidMove(&currentShape, gameboard, 'C')) {
-						currentShape.currentRotation = ((currentShape.currentRotation + 1) % NUM_ROTATIONS + NUM_ROTATIONS) % NUM_ROTATIONS;
+					case SDLK_a: { if(isValidMove(&game->currentShape, &game->gameboard, 'L')) game->currentShape.x--; break;}
+					case SDLK_d: { if (isValidMove(&game->currentShape, &game->gameboard, 'R'))  game->currentShape.x++; break;}
+					case SDLK_s: { if (isValidMove(&game->currentShape, &game->gameboard, 'D'))  game->currentShape.y++; break;}
+					case SDLK_SPACE: { while(isValidMove(&game->currentShape, &game->gameboard, 'D'))  game->currentShape.y++; break;}
+					case SDLK_RIGHT: { if (isValidMove(&game->currentShape, &game->gameboard, 'C')) {
+						game->currentShape.currentRotation = (( game->currentShape.currentRotation + 1) % NUM_ROTATIONS + NUM_ROTATIONS) % NUM_ROTATIONS;
 						break;}
 					}
-					case SDLK_LEFT: { if (isValidMove(&currentShape, gameboard, 'A')) {
-						currentShape.currentRotation = ((currentShape.currentRotation - 1) % NUM_ROTATIONS + NUM_ROTATIONS) % NUM_ROTATIONS;
+					case SDLK_LEFT: { if (isValidMove(&game->currentShape, &game->gameboard, 'A')) {
+						game->currentShape.currentRotation = ((game->currentShape.currentRotation - 1) % NUM_ROTATIONS + NUM_ROTATIONS) % NUM_ROTATIONS;
 						break;}
 					}
 				}
 			}
 		}
-		clock_t end = clock();
-		timeElapsed += ((double)(end - start)) * 1000 / CLOCKS_PER_SEC;
-		int incrementShapeY = (timeElapsed >= ( 7000 / ((currentLevel + 1)/2)));
-		clear(renderer, tetrisRows);  
-		draw(renderer, gameboard, &currentShape, &nextShape, score, currentLevel); 
-		if (incrementShapeY) {
-			if (!update(&currentShape, &nextShape, gameboard, tetrisRows, &score, &currentLevel)) {
-				//end-game conditions met
-				break;
-			}
-			start = clock();
-			timeElapsed = 0;
+
+		clock_t currentTime = clock();
+		
+		if (!update(game, (double)(currentTime - lastUpdate) / CLOCKS_PER_SEC)) {
+			//end-game conditions met
+			break;
 		}
+
+		lastUpdate = currentTime;
+		clear(renderer);  
+		draw(renderer, &game->gameboard, &game->currentShape, &game->nextShape, game->score, game->currentLevel);
 		SDL_Delay(20);
 	}
 	printf("\n\n\n~~~~~~~ G A M E   O V E R ~~~~~~~\n\n\n");
 	SDL_DestroyRenderer(renderer);
+	DeinitGameboard(&game->gameboard);
 	SDL_Quit();
 	return 1;
 }
