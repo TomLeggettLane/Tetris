@@ -18,6 +18,7 @@
 #define numberBoxHeight 7
 #define numberBoxWidth 5
 #define textPixelSize 2
+#define NUM_COLOUR_SCHEMES 5
 
 //TODO:
 	//add game over/start again screen 
@@ -124,8 +125,6 @@ SDL_Rect nine[7] = { {0, scorePixelSize , scorePixelSize, 2 * scorePixelSize},
 						{-1,-1,-1,-1}
 };
 
-SDL_Rect* numbers[10] = { zero,one,two,three,four,five,six,seven,eight,nine };
-
 SDL_Rect s[7] = {
 				{textPixelSize, 0, 3 * textPixelSize, textPixelSize},
 				{ 4 * textPixelSize, textPixelSize, textPixelSize, textPixelSize },
@@ -189,8 +188,9 @@ SDL_Rect v[7] = {
 	{-1,-1,-1,-1},{-1,-1,-1,-1}
 };
 
-SDL_Rect* letters[7] = { s, c, o, r, e, l, v };
+SDL_Rect* numbers[10] = { zero,one,two,three,four,five,six,seven,eight,nine };
 
+SDL_Rect* letters[7] = { s, c, o, r, e, l, v };
 
 typedef struct {
 	SDL_Rect outerRect;
@@ -216,6 +216,42 @@ typedef struct {
 	int numGameRows;
 	int numGameCols;
 } Gameboard;
+
+typedef struct {
+	int primaryRGB[3];
+	int secondaryRGB[3];
+	int specularRGB[3];
+} ColourScheme;
+
+ColourScheme redScheme = {
+	.primaryRGB = { 165, 42, 42 },
+	.secondaryRGB = { 211, 211, 211 },
+	.specularRGB = { 255, 255, 255 },
+};
+
+ColourScheme greenScheme = {
+	.primaryRGB = { 42, 165, 42 },
+	.secondaryRGB = { 211, 211, 211 },
+	.specularRGB = { 255, 255, 255 },
+};
+
+ColourScheme blueScheme = {
+	.primaryRGB = { 42, 42, 165 },
+	.secondaryRGB = { 211, 211, 211 },
+	.specularRGB = { 255, 255, 255 },
+};
+
+ColourScheme whiteScheme = {
+	.primaryRGB = { 255, 255, 255 },
+	.secondaryRGB = { 255, 255, 255 },
+	.specularRGB = { 255, 255, 255 },
+};
+
+ColourScheme greyScheme = {
+	.primaryRGB = { 75, 75, 75 },
+	.secondaryRGB = { 75, 75, 75 },
+	.specularRGB = { 75, 75, 75 },
+};
 
 CubeVisualDesign HollowCubeDesign = {
 	.outerRect = { 0,0, PIXEL_SIZE - 2 * MARGIN, PIXEL_SIZE - 2 * MARGIN },
@@ -244,14 +280,15 @@ typedef struct {
 	int currentLevel;
 	int tetrisRows[4];
 	double timeToMove;
+	int totalLinesCleared;
+	int currentColourIndex;
 } Game;
 
 /* ~ ~ ~ ~ ~ ~ ~ ~ DRAW METHODS ~ ~ ~ ~ ~ ~ ~ ~ */
 
-void drawLetter(SDL_Renderer* renderer, int x, int y, char letterToDraw) {
+void drawLetter(SDL_Renderer* renderer, int screenX, int screenY, char letterToDraw) {
 	SDL_SetRenderDrawColor(renderer, 255, 255, 255, SDL_ALPHA_OPAQUE);
-
-	int letterIndex = 0;
+	int letterIndex = -1;
 
 	switch (letterToDraw) {
 		case ' ': return;
@@ -264,42 +301,108 @@ void drawLetter(SDL_Renderer* renderer, int x, int y, char letterToDraw) {
 		case 'v': {letterIndex = 6; break;}
 	}
 
+	if (letterIndex < 0 || letterIndex > 6) return;
+
 	//draw each rectangle defined in letter mesh
 	for (int i = 0; i < 7; i++) {
 		if (letters[letterIndex][i].x == -1) break;
-		letters[letterIndex][i].x += (x + scorePixelSize);
-		letters[letterIndex][i].y += (y + scorePixelSize);
+		letters[letterIndex][i].x += (screenX + scorePixelSize);
+		letters[letterIndex][i].y += (screenY + scorePixelSize);
 		SDL_RenderDrawRect(renderer, &letters[letterIndex][i]);
 		SDL_RenderFillRect(renderer, &letters[letterIndex][i]);
-		letters[letterIndex][i].x -= (x + scorePixelSize);
-		letters[letterIndex][i].y -= (y + scorePixelSize);
+		letters[letterIndex][i].x -= (screenX + scorePixelSize);
+		letters[letterIndex][i].y -= (screenY + scorePixelSize);
 	}
 }
 
-void drawNumber(SDL_Renderer* renderer, int x, int y, int digitToDraw) {
+void drawNumber(SDL_Renderer* renderer, int screenX, int screenY, int digitToDraw) {
 	SDL_SetRenderDrawColor(renderer, 255, 255, 255, SDL_ALPHA_OPAQUE);
 
 	//draw each rectangle defined in digit mesh
 	for (int i = 0; i < 7; i++) {
 		if (numbers[digitToDraw][i].x == -1) break;
-		numbers[digitToDraw][i].x += (x + scorePixelSize);
-		numbers[digitToDraw][i].y += (y + scorePixelSize);
+		numbers[digitToDraw][i].x += (screenX + scorePixelSize);
+		numbers[digitToDraw][i].y += (screenY + scorePixelSize);
 		SDL_RenderDrawRect(renderer, &numbers[digitToDraw][i]);
 		SDL_RenderFillRect(renderer, &numbers[digitToDraw][i]);
-		numbers[digitToDraw][i].x -= (x + scorePixelSize);
-		numbers[digitToDraw][i].y -= (y + scorePixelSize);
+		numbers[digitToDraw][i].x -= (screenX + scorePixelSize);
+		numbers[digitToDraw][i].y -= (screenY + scorePixelSize);
 	}
 }
 
 void drawScore(SDL_Renderer* renderer, int score) {
-	char scoreTextArray[6] = { ' ', 'e', 'r', 'o', 'c', 's'};
+	//char scoreTextArray[6] = { ' ', 'e', 'r', 'o', 'c', 's'};
+	char scoreTextArray[6] = { 's', 'c', 'o', 'r', 'e', ' ' };
 
 	//draw each digit in the current score (from least significant digit to most)
 	for (int i = 0; i < 6; i++) {
 		int digitToDraw = score % 10;
 		score = score / 10;
 		drawNumber(renderer, 7 + (5-i) * (13), 22 * PIXEL_SIZE, digitToDraw);
-		drawLetter(renderer, 7 + (5 - i) * (13), 21 * PIXEL_SIZE, scoreTextArray[i]);
+		drawLetter(renderer, 7 + (5 - i) * (13), 21 * PIXEL_SIZE, scoreTextArray[5-i]);
+	}
+}
+
+void drawShape(SDL_Renderer* renderer, Tetromino currentShape, int screenX, int screenY, ColourScheme currentColour) {
+	short bitmap = currentShape.rotations[currentShape.currentRotation];
+
+	unsigned short bitmask = 0b1000000000000000;
+	for (int i = 0; i < 4; i++) {
+		for (int j = 0; j < 4; j++) {
+			if (bitmask & bitmap) {
+				HollowCubeDesign.outerRect.x = screenX + j * PIXEL_SIZE + MARGIN;
+				HollowCubeDesign.outerRect.y = screenY + i * PIXEL_SIZE + MARGIN;
+				SDL_SetRenderDrawColor(renderer, currentColour.primaryRGB[0], currentColour.primaryRGB[1], currentColour.primaryRGB[2], SDL_ALPHA_OPAQUE);
+				SDL_RenderDrawRect(renderer, &HollowCubeDesign.outerRect);
+				SDL_RenderFillRect(renderer, &HollowCubeDesign.outerRect);
+				
+				HollowCubeDesign.innerRect.x = screenX + j * PIXEL_SIZE + BORDER + MARGIN;
+				HollowCubeDesign.innerRect.y = screenY + i * PIXEL_SIZE + BORDER + MARGIN;
+				SDL_SetRenderDrawColor(renderer, currentColour.secondaryRGB[0], currentColour.secondaryRGB[1], currentColour.secondaryRGB[2], SDL_ALPHA_OPAQUE);
+				SDL_RenderDrawRect(renderer, &HollowCubeDesign.innerRect);
+				SDL_RenderFillRect(renderer, &HollowCubeDesign.innerRect);
+
+				HollowCubeDesign.specularRect.x = screenX + j * PIXEL_SIZE + MARGIN;
+				HollowCubeDesign.specularRect.y = screenY + i * PIXEL_SIZE + MARGIN;
+				SDL_SetRenderDrawColor(renderer, currentColour.specularRGB[0], currentColour.specularRGB[1], currentColour.specularRGB[2], SDL_ALPHA_OPAQUE);
+				SDL_RenderDrawRect(renderer, &HollowCubeDesign.specularRect);
+				SDL_RenderFillRect(renderer, &HollowCubeDesign.specularRect);
+			}
+			bitmask = bitmask >> 1;
+		}
+	}
+}
+
+void drawBoard(SDL_Renderer* renderer, Gameboard gameboard, ColourScheme currentColour) {
+	for (int i = 0; i < gameboard.numGameRows; i++) {
+		unsigned short bitmask = 0b1000000000;
+		for (int j = 0; j < gameboard.numGameCols; j++) {
+			if (bitmask & gameboard.cells[i + HIDDEN_ROWS]) {
+				ColouredCubeDesign.outerRect.x = j * PIXEL_SIZE + MARGIN;
+				ColouredCubeDesign.outerRect.y = i * PIXEL_SIZE + MARGIN;
+				SDL_SetRenderDrawColor(renderer, currentColour.primaryRGB[0], currentColour.primaryRGB[1], currentColour.primaryRGB[2], SDL_ALPHA_OPAQUE);
+				SDL_RenderDrawRect(renderer, &ColouredCubeDesign.outerRect);
+				SDL_RenderFillRect(renderer, &ColouredCubeDesign.outerRect);
+
+				ColouredCubeDesign.innerRect.x = j * PIXEL_SIZE + BORDER + MARGIN;
+				ColouredCubeDesign.innerRect.y = i * PIXEL_SIZE + BORDER + MARGIN;
+				SDL_SetRenderDrawColor(renderer, currentColour.secondaryRGB[0], currentColour.secondaryRGB[1], currentColour.secondaryRGB[2], SDL_ALPHA_OPAQUE);
+				SDL_RenderDrawRect(renderer, &ColouredCubeDesign.innerRect);
+				SDL_RenderFillRect(renderer, &ColouredCubeDesign.innerRect);
+
+				ColouredCubeDesign.innerRect2.x = j * PIXEL_SIZE + BORDER + MARGIN;
+				ColouredCubeDesign.innerRect2.y = i * PIXEL_SIZE + BORDER + MARGIN;
+				SDL_RenderDrawRect(renderer, &ColouredCubeDesign.innerRect2);
+				SDL_RenderFillRect(renderer, &ColouredCubeDesign.innerRect2);
+
+				ColouredCubeDesign.specularRect.x = j * PIXEL_SIZE + MARGIN;
+				ColouredCubeDesign.specularRect.y = i * PIXEL_SIZE + MARGIN;
+				SDL_SetRenderDrawColor(renderer, currentColour.specularRGB[0], currentColour.specularRGB[1], currentColour.specularRGB[2], SDL_ALPHA_OPAQUE);
+				SDL_RenderDrawRect(renderer, &ColouredCubeDesign.specularRect);
+				SDL_RenderFillRect(renderer, &ColouredCubeDesign.specularRect);
+			}
+			bitmask = bitmask >> 1;
+		}
 	}
 }
 
@@ -317,7 +420,7 @@ void drawLevel(SDL_Renderer* renderer, int currentLevel) {
 	}
 }
 
-void drawStats(SDL_Renderer* renderer, Tetromino* nextShape) {
+void drawStats(SDL_Renderer* renderer) {
 	//stats width = 4.75 (5.25 -> 10), height = 4.5 (20.5 --> 25)
 
 	SDL_Rect verticalWallSection;
@@ -341,107 +444,80 @@ void drawStats(SDL_Renderer* renderer, Tetromino* nextShape) {
 	return;
 }
 
-void drawCurrentShape(SDL_Renderer* renderer, Tetromino* currentShape) {
-	int screenX = currentShape->x * PIXEL_SIZE;
-	int screenY = currentShape->y * PIXEL_SIZE;
-	drawShape(renderer, currentShape, screenX, screenY);
+void drawCurrentShape(SDL_Renderer* renderer, Tetromino currentShape, ColourScheme currentColour) {
+	int screenX = currentShape.x * PIXEL_SIZE;
+	int screenY = currentShape.y * PIXEL_SIZE;
+	drawShape(renderer, currentShape, screenX, screenY, currentColour);
 }
 
-void drawNextShape(SDL_Renderer* renderer, Tetromino* nextShape) {
+void drawNextShape(SDL_Renderer* renderer, Tetromino nextShape, ColourScheme currentColour) {
 	int previewXpos = 123;
 	int previewYpos = 415;
 
 	//Centers nextShape in the 'preview next shape' box;
-	if (nextShape->shapeType == 0) {
+	if (nextShape.shapeType == 0) {
 		previewXpos -= PIXEL_SIZE / 2;
 	}
-	else if (nextShape->shapeType == 1) {
+	else if (nextShape.shapeType == 1) {
 		previewXpos -= PIXEL_SIZE / 2;
 		previewYpos += PIXEL_SIZE / 2;
 	}
 
-	drawShape(renderer, nextShape, previewXpos, previewYpos);
+	drawShape(renderer, nextShape, previewXpos, previewYpos, currentColour);
 }
 
-void draw(SDL_Renderer* renderer, Gameboard* gameboard, Tetromino* currentShape, Tetromino* nextShape, int score, int currentLevel) {
-	drawStats(renderer, nextShape);
-	drawBoard(renderer, gameboard);
-	drawCurrentShape(renderer, currentShape);
-	drawNextShape(renderer, nextShape);
+void animateAndClearTetrisRows(SDL_Renderer* renderer, int tetrisRows[]) {
+	SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
+	SDL_Rect rect;
+	rect.w = PIXEL_SIZE;
+	rect.h = PIXEL_SIZE;
+	int numTetrisRows = 0;
+
+	for (int i = 0; i < 4; i++) {
+		if (tetrisRows[i] == -1) break;
+		numTetrisRows++;
+	}
+
+	if (!numTetrisRows) return;
+
+	for (int j = 0; j < COLS / 2; j++) {
+		for (int i = 0; i < numTetrisRows; i++) {
+			rect.x = (4 - j) * PIXEL_SIZE;
+			rect.y = tetrisRows[i] * PIXEL_SIZE;
+
+			SDL_RenderDrawRect(renderer, &rect);
+			SDL_RenderFillRect(renderer, &rect);
+
+			rect.x = (5 + j) * PIXEL_SIZE;
+			SDL_RenderDrawRect(renderer, &rect);
+			SDL_RenderFillRect(renderer, &rect);
+		}
+		SDL_RenderPresent(renderer);
+		SDL_Delay(35);
+	}
+
+	resetTetrisRows(tetrisRows);
+}
+
+void draw(SDL_Renderer* renderer, Game* game, ColourScheme currentColour) {
+	Gameboard gameboard = game->gameboard;
+	Tetromino currentShape = game->currentShape;
+	Tetromino nextShape = game->nextShape;
+	int score = game->score;
+	int currentLevel = game->currentLevel;
+
+	drawStats(renderer);
+	drawBoard(renderer, gameboard, currentColour);
+	drawCurrentShape(renderer, currentShape, currentColour);
+	drawNextShape(renderer, nextShape, currentColour);
 	drawScore(renderer, score);
 	drawLevel(renderer, currentLevel);
 	SDL_RenderPresent(renderer);
 }
 
-int drawShape(SDL_Renderer* renderer, Tetromino *currentShape, int screenX, int screenY) {
-	short bitmap = currentShape->rotations[currentShape->currentRotation];
-
-	unsigned short bitmask = 0b1000000000000000;
-	for (int i = 0; i < 4; i++) {
-		for (int j = 0; j < 4; j++) {
-			if (bitmask & bitmap) {
-				HollowCubeDesign.outerRect.x = screenX + j * PIXEL_SIZE + MARGIN;
-				HollowCubeDesign.outerRect.y = screenY + i * PIXEL_SIZE + MARGIN;
-				SDL_SetRenderDrawColor(renderer, HollowCubeDesign.RGBouterRect[0], HollowCubeDesign.RGBouterRect[1], HollowCubeDesign.RGBouterRect[2], SDL_ALPHA_OPAQUE);
-				SDL_RenderDrawRect(renderer, &HollowCubeDesign.outerRect);
-				SDL_RenderFillRect(renderer, &HollowCubeDesign.outerRect);
-
-				HollowCubeDesign.innerRect.x = screenX + j * PIXEL_SIZE + BORDER + MARGIN;
-				HollowCubeDesign.innerRect.y = screenY + i * PIXEL_SIZE + BORDER + MARGIN;
-				SDL_SetRenderDrawColor(renderer, HollowCubeDesign.RGBinnerRect[0], HollowCubeDesign.RGBinnerRect[1], HollowCubeDesign.RGBinnerRect[2], SDL_ALPHA_OPAQUE);
-				SDL_RenderDrawRect(renderer, &HollowCubeDesign.innerRect);
-				SDL_RenderFillRect(renderer, &HollowCubeDesign.innerRect);
-				
-				HollowCubeDesign.specularRect.x = screenX + j * PIXEL_SIZE + MARGIN;
-				HollowCubeDesign.specularRect.y = screenY + i * PIXEL_SIZE + MARGIN;
-				SDL_SetRenderDrawColor(renderer, HollowCubeDesign.RGBspecularRect[0], HollowCubeDesign.RGBspecularRect[1], HollowCubeDesign.RGBspecularRect[2], SDL_ALPHA_OPAQUE);
-				SDL_RenderDrawRect(renderer, &HollowCubeDesign.specularRect);
-				SDL_RenderFillRect(renderer, &HollowCubeDesign.specularRect);
-			}
-			bitmask = bitmask >> 1;
-		}
-	}
-	return 1;
-}
-
-int drawBoard(SDL_Renderer* renderer, Gameboard* gameboard) {
-	for (int i = 0; i < gameboard->numGameRows; i++) {
-		unsigned short bitmask = 0b1000000000;
-		for (int j = 0; j < gameboard->numGameCols; j++) {
-			if (bitmask & gameboard->cells[i + HIDDEN_ROWS]) {
-				ColouredCubeDesign.outerRect.x = j * PIXEL_SIZE + MARGIN;
-				ColouredCubeDesign.outerRect.y = i * PIXEL_SIZE + MARGIN;
-				SDL_SetRenderDrawColor(renderer, ColouredCubeDesign.RGBouterRect[0], ColouredCubeDesign.RGBouterRect[1], ColouredCubeDesign.RGBouterRect[2], SDL_ALPHA_OPAQUE);
-				SDL_RenderDrawRect(renderer, &ColouredCubeDesign.outerRect);
-				SDL_RenderFillRect(renderer, &ColouredCubeDesign.outerRect);
-
-				ColouredCubeDesign.innerRect.x = j * PIXEL_SIZE + BORDER + MARGIN;
-				ColouredCubeDesign.innerRect.y = i * PIXEL_SIZE + BORDER + MARGIN;
-				SDL_SetRenderDrawColor(renderer, ColouredCubeDesign.RGBinnerRect[0], ColouredCubeDesign.RGBinnerRect[1], ColouredCubeDesign.RGBinnerRect[2], SDL_ALPHA_OPAQUE);
-				SDL_RenderDrawRect(renderer, &ColouredCubeDesign.innerRect);
-				SDL_RenderFillRect(renderer, &ColouredCubeDesign.innerRect);
-
-				ColouredCubeDesign.innerRect2.x = j * PIXEL_SIZE + BORDER + MARGIN;
-				ColouredCubeDesign.innerRect2.y = i * PIXEL_SIZE + BORDER + MARGIN;
-				SDL_RenderDrawRect(renderer, &ColouredCubeDesign.innerRect2);
-				SDL_RenderFillRect(renderer, &ColouredCubeDesign.innerRect2);
-
-				ColouredCubeDesign.specularRect.x = j * PIXEL_SIZE + MARGIN;
-				ColouredCubeDesign.specularRect.y = i * PIXEL_SIZE + MARGIN;
-				SDL_SetRenderDrawColor(renderer, ColouredCubeDesign.RGBspecularRect[0], ColouredCubeDesign.RGBspecularRect[1], ColouredCubeDesign.RGBspecularRect[2], SDL_ALPHA_OPAQUE);
-				SDL_RenderDrawRect(renderer, &ColouredCubeDesign.specularRect);
-				SDL_RenderFillRect(renderer, &ColouredCubeDesign.specularRect);
-			}
-			bitmask = bitmask >> 1;
-		}
-	}
-	return 1;
-}
-
-int clear(SDL_Renderer* renderer) {
+void clear(SDL_Renderer* renderer) {
 	SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
 	SDL_RenderClear(renderer);
-	return 1;
 }
 
 /* ~ ~ ~ ~ ~ ~ ~ ~ UPDATE METHODS ~ ~ ~ ~ ~ ~ ~ ~ */
@@ -513,19 +589,26 @@ Game* createGame(int numRows, int numCols) {
 
 	game->score = 0;
 	game->currentLevel = 1;
-	game->tetrisRows[0] = -1;    //updates elements to the row numbers if a row is full (ie tetris scored) otherwise -1
-	game->tetrisRows[1] = -1; 								   //users current score
-	game->tetrisRows[2] = -1;
-	game->tetrisRows[3] = -1;
+	game->totalLinesCleared = 0;
+	game->currentColourIndex = 4;
+
+	for (int i = 0; i < sizeof(*game->tetrisRows); i++) {
+		game->tetrisRows[i] = -1;
+	}
+	    //updates elements to the row numbers if a row is full (ie tetris scored) otherwise -1
 
 	return game;
+}
+
+void destroyGame(Game* game) {
+	free(game);
 }
 
 void DeinitGameboard(Gameboard* gameboard) {
 	free(gameboard->cells);
 }
 
-int updateTetrisRowsAndGameboard(Gameboard* gameboard, int tetrisRows[]) {
+void updateTetrisRowsAndGameboard(Gameboard* gameboard, int tetrisRows[]) {
 	int rows_index = 0;
 	int tempGameboard[TOTAL_ROWS];
 	int temp_ptr = TOTAL_ROWS - 1;
@@ -533,14 +616,14 @@ int updateTetrisRowsAndGameboard(Gameboard* gameboard, int tetrisRows[]) {
 	//add all full rows to tetrisRows, else add to tempGameboard
 	for (int i = temp_ptr; i >= HIDDEN_ROWS; i--) {
 		if (gameboard->cells[i] == 0b1111111111) {
-			tetrisRows[rows_index++] = i;
+			tetrisRows[rows_index++] = i-HIDDEN_ROWS;
 		}
 		else {
 			tempGameboard[temp_ptr--] = gameboard->cells[i];
 		}
 	}
 
-	if (!rows_index) return 0; //no tetris rows found --> (no change in gameboard) 
+	if (!rows_index) return; //no tetris rows found --> (no change in gameboard) 
 
 	//update the new state of the gameboard with full rows removed
 	for (int i = TOTAL_ROWS - 1; i > -1; i--) {
@@ -551,8 +634,6 @@ int updateTetrisRowsAndGameboard(Gameboard* gameboard, int tetrisRows[]) {
 			gameboard->cells[i] = 0;
 		}
 	}
-
-	return rows_index;
 }
 
 void copyShapeToBoard(Tetromino* currentShape, Gameboard* gameboard) {
@@ -579,14 +660,16 @@ void copyShapeToBoard(Tetromino* currentShape, Gameboard* gameboard) {
 	return;
 }
 
-void updateScore(int* score, int tetrisRows[4]) {
+void updateScore(int* score, int tetrisRows[4], int *totalLinesCleared) {
 	int tetrisCount = 0;
 	for (int i = 0; i < 4; i++) {
 		if (tetrisRows[i] >= 0) {
 			tetrisCount++;
-			tetrisRows[i] = -1;
+			(*totalLinesCleared)++;
+			/*tetrisRows[i] = -1;*/
 		}
 	}
+
 
 	switch (tetrisCount) {
 	case 1: {*score += 40; break;}
@@ -596,11 +679,30 @@ void updateScore(int* score, int tetrisRows[4]) {
 	}
 }
 
-void updateLevel(int score, int* currentLevel) {
-	int level = *currentLevel;
-	if (score >= 40 * level * level + pow(2, level) + 2) {
-		(*currentLevel)++;
+void updateColourIndex(int* colourIndex) {
+	int newIndex = *colourIndex;
+	while (newIndex == *colourIndex) {
+		newIndex = rand() % NUM_COLOUR_SCHEMES;
 	}
+	*colourIndex = newIndex;
+}
+
+void updateLevel(int* currentLevel, int totalLinesCleared, int* colourIndex) {
+	if (totalLinesCleared > (*currentLevel-1) * (5 + *currentLevel / 2)) {
+		(*currentLevel)++;
+		updateColourIndex(colourIndex);
+	}
+}
+
+int updateTimeToMove(int* timeToMove, int currentLevel, double timeElapsed) {
+	*timeToMove -= timeElapsed;
+
+	if (*timeToMove > 0) {
+		return 1;
+	}
+
+	*timeToMove += 30 * exp(-currentLevel / 8.0);
+	return 0;
 }
 
 int isValidMove(Tetromino *currentShape, Gameboard* gameboard, char moveType) {
@@ -648,15 +750,12 @@ int update(Game* game, double timeElapsed) {
 	int* tetrisRows = game->tetrisRows;
 	int* score = &game->score;
 	int* currentLevel = &game->currentLevel;
+	int* totalLinesCleared = &game->totalLinesCleared;
+	int* currentColourIndex = &game->currentColourIndex;
 
-	game->timeToMove -= timeElapsed;
-	int incrementShapeY = game->timeToMove < 0.0;
-
-	if (!incrementShapeY) {
+	if (updateTimeToMove(&game->timeToMove, *currentLevel, timeElapsed)) {
 		return 1;
 	}
-
-	game->timeToMove += 0.1 / ((game->currentLevel + 1) / 2);
 
 	if (isValidMove(currentShape, gameboard, 'D')) {
 		currentShape->y++;
@@ -670,19 +769,25 @@ int update(Game* game, double timeElapsed) {
 
 	copyShapeToBoard(currentShape, gameboard);
 	updateTetrisRowsAndGameboard(gameboard, tetrisRows);
-	updateScore(score, tetrisRows);
-	updateLevel(*score, currentLevel);
+	updateScore(score, tetrisRows, totalLinesCleared);
+	updateLevel(currentLevel, *totalLinesCleared, currentColourIndex);
 	initNewShape(currentShape, nextShape);
-	return checkEndGame(gameboard);
+	return checkEndGame(*gameboard);
 }
 
-int checkEndGame(Gameboard* gameboard) {
+int checkEndGame(Gameboard gameboard) {
 	for (int i = 0; i < HIDDEN_ROWS; i++) {
-		if (gameboard->cells[i]) {
+		if (gameboard.cells[i]) {
 			return 0;
 		}
 	}
 	return 1;
+}
+
+int resetTetrisRows(int tetrisRows[]) {
+	for (int i = 0; i < 4; i++) {
+		tetrisRows[i] = -1;
+	}
 }
 
 SDL_Renderer* initGraphicsAndGetRenderer() {
@@ -718,10 +823,25 @@ SDL_Renderer* initGraphicsAndGetRenderer() {
 	return renderer;
 }
 
+ColourScheme* createColoursArray(int size, ColourScheme redScheme, ColourScheme greenScheme, ColourScheme blueScheme, ColourScheme whiteScheme, ColourScheme greyScheme) {
+	ColourScheme* colours = malloc(sizeof(ColourScheme) * size);
+
+	colours[0] = redScheme;
+	colours[1] = greenScheme;
+	colours[2] = blueScheme;
+	colours[3] = whiteScheme;
+	colours[4] = greyScheme;
+	return colours;
+}
+
+void destroyColoursArray(ColourScheme* colours) {
+	free(colours);
+}
 
 /* ~ ~ ~ ~ ~ ~ ~ ~ MAIN METHOD ~ ~ ~ ~ ~ ~ ~ ~ */
 
 int main(int argc, char* args[]) {
+	ColourScheme* colours = createColoursArray(NUM_COLOUR_SCHEMES, redScheme, greenScheme, blueScheme, whiteScheme, greyScheme);
 	Game* game = createGame(ROWS, COLS);
 	SDL_Renderer* renderer = initGraphicsAndGetRenderer();
 	srand(time(NULL));		//sets new seed for random number generator;
@@ -760,15 +880,19 @@ int main(int argc, char* args[]) {
 			//end-game conditions met
 			break;
 		}
-
+		if (game->tetrisRows[0] != -1) {
+			animateAndClearTetrisRows(renderer, game->tetrisRows);
+		}
 		lastUpdate = currentTime;
 		clear(renderer);  
-		draw(renderer, &game->gameboard, &game->currentShape, &game->nextShape, game->score, game->currentLevel);
+		draw(renderer, game, colours[game->currentColourIndex]);
 		SDL_Delay(20);
 	}
 	printf("\n\n\n~~~~~~~ G A M E   O V E R ~~~~~~~\n\n\n");
 	SDL_DestroyRenderer(renderer);
 	DeinitGameboard(&game->gameboard);
+	destroyGame(game);
+	destroyColoursArray(colours);
 	SDL_Quit();
 	return 1;
 }
