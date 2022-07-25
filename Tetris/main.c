@@ -3,6 +3,8 @@
 #include <SDL.h>
 #include <SDL_timer.h>
 #include <time.h>
+#include "text.h"
+#include "colours.h"
 
 #define PIXEL_SIZE 20
 #define COLS 10
@@ -14,183 +16,17 @@
 #define STATS_ROWS 3
 #define MARGIN PIXEL_SIZE / 20
 #define BORDER PIXEL_SIZE / 10
-#define scorePixelSize 2
-#define numberBoxHeight 7
-#define numberBoxWidth 5
 #define textPixelSize 2
-#define NUM_COLOUR_SCHEMES 5
-
-//TODO:
-	//add game over/start again screen 
-	//add sounds
 
 const short shapeRotations[7][4] = {
-										 { 0b0000011001100000, 0b0000011001100000, 0b0000011001100000, 0b0000011001100000 }, //Square, 0 rotations
-										 { 0b0000111100000000, 0b0010001000100010, 0b0000111100000000, 0b0010001000100010 }, //I, 2 rotations, default is horitzonal
-										 { 0b0000111001000000, 0b0100110001000000, 0b0100111000000000, 0b0100011001000000 }, //T, 4 rotations, default is horizontal
-										 { 0b0000111000100000, 0b0100010011000000, 0b1000111000000000, 0b0110010001000000 }, //J, 4 rotations, default is horizontal down
-										 { 0b0000111010000000, 0b1100010001000000, 0b0010111000000000, 0b0100010001100000 }, //L, 4 rotations, default is horizontal down
-										 { 0b0000110001100000, 0b0100110010000000, 0b0000110001100000, 0b0100110010000000 }, //Z, 2 rotations, default is Z-shape
-										 { 0b0000011011000000, 0b0100011000100000, 0b0000011011000000, 0b0100011000100000 }, //S, 2 rotations, default is S-shape
-										};
-
-// x , y , width , height
-SDL_Rect zero[7] = { {scorePixelSize, 0, 3 * scorePixelSize, scorePixelSize},
-					 {scorePixelSize, (numberBoxHeight - 1) * scorePixelSize, 3 * scorePixelSize, scorePixelSize},
-					 {0, scorePixelSize, scorePixelSize, 5 * scorePixelSize},
-					 {(numberBoxWidth - 1) * scorePixelSize, scorePixelSize , scorePixelSize, 5 * scorePixelSize},
-					 {3 * scorePixelSize, 2 * scorePixelSize , scorePixelSize, scorePixelSize},
-				   	 {2 * scorePixelSize, 3 * scorePixelSize , scorePixelSize, scorePixelSize},
-			     	 {1 * scorePixelSize, 4 * scorePixelSize , scorePixelSize, scorePixelSize}
-				   };
-
-SDL_Rect one[7] = { {0, (numberBoxHeight-1) * scorePixelSize, numberBoxWidth * scorePixelSize, scorePixelSize},
-					 {2 * scorePixelSize, 0 , scorePixelSize, numberBoxHeight * scorePixelSize},
-					 {scorePixelSize, scorePixelSize , scorePixelSize, scorePixelSize},
-					 {0 , 2 * scorePixelSize , scorePixelSize, scorePixelSize},
-					{-1,-1,-1,-1},
-					{-1,-1,-1,-1},
-					{-1,-1,-1,-1}
-};
-
-SDL_Rect two[7] = { {0, (numberBoxHeight - 1) * scorePixelSize, numberBoxWidth * scorePixelSize, scorePixelSize},
-				    {0, 5 * scorePixelSize , scorePixelSize, scorePixelSize},
-					{scorePixelSize, 4 * scorePixelSize , scorePixelSize, scorePixelSize},
-					{2 * scorePixelSize, 3 * scorePixelSize , 2 * scorePixelSize, scorePixelSize},
-					{4 * scorePixelSize, scorePixelSize , scorePixelSize, 2 * scorePixelSize},
-					{scorePixelSize, 0 , 3*scorePixelSize, scorePixelSize},
-					{0, scorePixelSize , scorePixelSize, scorePixelSize}
-};
-
-SDL_Rect three[7] = { {0, scorePixelSize , scorePixelSize, scorePixelSize},
-						{scorePixelSize, 0 , 3 * scorePixelSize, scorePixelSize},
-						{4 * scorePixelSize, scorePixelSize , scorePixelSize, 2 * scorePixelSize},
-						{scorePixelSize, 3 * scorePixelSize , 3 * scorePixelSize, scorePixelSize},
-						{4 * scorePixelSize, 4 * scorePixelSize , scorePixelSize, 2 * scorePixelSize},
-						{scorePixelSize, 6 * scorePixelSize , 3 * scorePixelSize, scorePixelSize},
-						{0, 5 * scorePixelSize , scorePixelSize, scorePixelSize}				
-};
-
-SDL_Rect four[7] = { {3 * scorePixelSize, 0 , scorePixelSize, 7 * scorePixelSize},
-{0 , 4 * scorePixelSize, 5 * scorePixelSize, scorePixelSize},
-{0, 3 * scorePixelSize , scorePixelSize, scorePixelSize},
-{scorePixelSize, 2 * scorePixelSize , scorePixelSize, scorePixelSize},
-{2 * scorePixelSize, scorePixelSize , scorePixelSize, scorePixelSize},
-{-1,-1,-1,-1},
-{-1,-1,-1,-1}
-};
-
-SDL_Rect five[7] = { {0, 0, 5 * scorePixelSize, scorePixelSize},
-					 {0, scorePixelSize, scorePixelSize, scorePixelSize},
-					 {0, 2 * scorePixelSize, 4 * scorePixelSize, scorePixelSize},
-					 {4 * scorePixelSize, 3 * scorePixelSize , scorePixelSize, 3 * scorePixelSize},
-					 {scorePixelSize, 6 * scorePixelSize , 3 * scorePixelSize, scorePixelSize},
-					 {0, 5 * scorePixelSize , scorePixelSize, scorePixelSize},
-					{-1,-1,-1,-1}
-};
-
-SDL_Rect six[7] = { {0, scorePixelSize , scorePixelSize, 5 * scorePixelSize},
-						{scorePixelSize, 0 , 3 * scorePixelSize, scorePixelSize},
-						{4 * scorePixelSize, scorePixelSize , scorePixelSize, scorePixelSize},
-						{0, 3 * scorePixelSize, 4 * scorePixelSize, scorePixelSize},
-						{4 * scorePixelSize, 4 * scorePixelSize , scorePixelSize, 2 * scorePixelSize},
-						{scorePixelSize, 6 * scorePixelSize , 3 * scorePixelSize, scorePixelSize},
-						{-1,-1,-1,-1}
-};
-
-SDL_Rect seven[7] = { {0, 0, 5 * scorePixelSize, scorePixelSize},
-			{4 * scorePixelSize, scorePixelSize , scorePixelSize, scorePixelSize},
-	{3 * scorePixelSize, 2 * scorePixelSize , scorePixelSize, scorePixelSize},
-	{2 * scorePixelSize, 3 * scorePixelSize , scorePixelSize, 4 * scorePixelSize},
-		{-1,-1,-1,-1},
-		{-1,-1,-1,-1},
-		{-1,-1,-1,-1}
-};
-
-SDL_Rect eight[7] = { {0, scorePixelSize , scorePixelSize, 2 * scorePixelSize},
-						{scorePixelSize, 0 , 3 * scorePixelSize, scorePixelSize},
-						{4 * scorePixelSize, scorePixelSize , scorePixelSize, 2 * scorePixelSize},
-						{scorePixelSize, 3 * scorePixelSize , 3 * scorePixelSize, scorePixelSize},
-						{4 * scorePixelSize, 4 * scorePixelSize , scorePixelSize, 2 * scorePixelSize},
-						{scorePixelSize, 6 * scorePixelSize , 3 * scorePixelSize, scorePixelSize},
-						{0, 4 * scorePixelSize , scorePixelSize, 2*scorePixelSize}
-};
-
-SDL_Rect nine[7] = { {0, scorePixelSize , scorePixelSize, 2 * scorePixelSize},
-						{scorePixelSize, 0 , 3 * scorePixelSize, scorePixelSize},
-						{4 * scorePixelSize, scorePixelSize , scorePixelSize, 5 * scorePixelSize},
-						{scorePixelSize, 3 * scorePixelSize , 3 * scorePixelSize, scorePixelSize},
-						{scorePixelSize, 6 * scorePixelSize , 3 * scorePixelSize, scorePixelSize},
-						{0, 5 * scorePixelSize , scorePixelSize, scorePixelSize},
-						{-1,-1,-1,-1}
-};
-
-SDL_Rect s[7] = {
-				{textPixelSize, 0, 3 * textPixelSize, textPixelSize},
-				{ 4 * textPixelSize, textPixelSize, textPixelSize, textPixelSize },
-				{ 0, textPixelSize, textPixelSize, 2 * textPixelSize },
-				{textPixelSize, 3 * textPixelSize, 3 * textPixelSize, textPixelSize},
-				{ 4 * textPixelSize, 4 * textPixelSize, textPixelSize, 2 * textPixelSize },
-				{textPixelSize, 6 * textPixelSize, 3 * textPixelSize, textPixelSize},
-				{0, 5 * textPixelSize, textPixelSize, textPixelSize},
-};
-
-SDL_Rect c[7] = {
-				{textPixelSize, 0, 3 * textPixelSize, textPixelSize},
-				{ 4 * textPixelSize, textPixelSize, textPixelSize, textPixelSize },
-				{ 0, textPixelSize, textPixelSize, 5 * textPixelSize },
-				{textPixelSize, 6 * textPixelSize, 3 * textPixelSize, textPixelSize},
-				{4*textPixelSize, 5 * textPixelSize, textPixelSize, textPixelSize},
-				{-1,-1,-1,-1},
-				{-1,-1,-1,-1}
-};
-
-SDL_Rect o[7] = { {textPixelSize, 0, 3 * textPixelSize, textPixelSize},
-					 {textPixelSize, 6 * textPixelSize, 3 * textPixelSize, textPixelSize},
-					 {0, textPixelSize, textPixelSize, 5 * textPixelSize},
-					 {4 * textPixelSize, textPixelSize , textPixelSize, 5 * textPixelSize},
-					{-1,-1,-1,-1},
-					{-1,-1,-1,-1},
-					{-1,-1,-1,-1}
-};
-
-SDL_Rect r[7] = {
-					 {0, 0, textPixelSize, 7 * textPixelSize},
-					{textPixelSize, 0, 3 * textPixelSize, textPixelSize},
-					{4 * textPixelSize, textPixelSize, textPixelSize, 2 * textPixelSize},
-					{0, 3 * textPixelSize, 4 * textPixelSize, textPixelSize},
-
-					{2 * textPixelSize, 4 * textPixelSize , textPixelSize, textPixelSize},
-					{3 * textPixelSize, 5 * textPixelSize , textPixelSize, textPixelSize},
-					 {4 * textPixelSize, 6 * textPixelSize , textPixelSize, textPixelSize}
-};
-
-SDL_Rect e[7] = {
-					{0, 0, textPixelSize, 7 * textPixelSize},
-					{0, 0, 5 * textPixelSize, textPixelSize},
-					{0, 3 * textPixelSize, 4 * textPixelSize, textPixelSize},
-					{0, 6* textPixelSize, 5 * textPixelSize, textPixelSize},
-					{-1,-1,-1,-1},{-1,-1,-1,-1},{-1,-1,-1,-1}
-};
-
-SDL_Rect l[7] = {
-	{0, 0, textPixelSize, 7 * textPixelSize},
-	{0, 6 * textPixelSize, 5 * textPixelSize, textPixelSize},
-	{-1,-1,-1,-1},{-1,-1,-1,-1},{-1,-1,-1,-1},{-1,-1,-1,-1},{-1,-1,-1,-1}
-};
-
-SDL_Rect v[7] = {
-	{0, 0, textPixelSize, 5 * textPixelSize},
-	{4 * textPixelSize, 0, textPixelSize, 5 * textPixelSize},
-	{textPixelSize, 5 * textPixelSize, textPixelSize, textPixelSize},
-	{3 * textPixelSize, 5 * textPixelSize, textPixelSize, textPixelSize},
-	{2 * textPixelSize, 6 * textPixelSize, textPixelSize, textPixelSize},
-	{-1,-1,-1,-1},{-1,-1,-1,-1}
-};
-
-SDL_Rect* numbers[10] = { zero,one,two,three,four,five,six,seven,eight,nine };
-
-SDL_Rect* letters[7] = { s, c, o, r, e, l, v };
+		{ 0b0000011001100000, 0b0000011001100000, 0b0000011001100000, 0b0000011001100000 }, //Square, 0 rotations
+		{ 0b0000111100000000, 0b0010001000100010, 0b0000111100000000, 0b0010001000100010 }, //I, 2 rotations, default is horitzonal
+		{ 0b0000111001000000, 0b0100110001000000, 0b0100111000000000, 0b0100011001000000 }, //T, 4 rotations, default is horizontal
+		{ 0b0000111000100000, 0b0100010011000000, 0b1000111000000000, 0b0110010001000000 }, //J, 4 rotations, default is horizontal down
+		{ 0b0000111010000000, 0b1100010001000000, 0b0010111000000000, 0b0100010001100000 }, //L, 4 rotations, default is horizontal down
+		{ 0b0000110001100000, 0b0100110010000000, 0b0000110001100000, 0b0100110010000000 }, //Z, 2 rotations, default is Z-shape
+		{ 0b0000011011000000, 0b0100011000100000, 0b0000011011000000, 0b0100011000100000 }, //S, 2 rotations, default is S-shape
+	};
 
 typedef struct {
 	SDL_Rect outerRect;
@@ -218,40 +54,16 @@ typedef struct {
 } Gameboard;
 
 typedef struct {
-	int primaryRGB[3];
-	int secondaryRGB[3];
-	int specularRGB[3];
-} ColourScheme;
-
-ColourScheme redScheme = {
-	.primaryRGB = { 165, 42, 42 },
-	.secondaryRGB = { 211, 211, 211 },
-	.specularRGB = { 255, 255, 255 },
-};
-
-ColourScheme greenScheme = {
-	.primaryRGB = { 42, 165, 42 },
-	.secondaryRGB = { 211, 211, 211 },
-	.specularRGB = { 255, 255, 255 },
-};
-
-ColourScheme blueScheme = {
-	.primaryRGB = { 42, 42, 165 },
-	.secondaryRGB = { 211, 211, 211 },
-	.specularRGB = { 255, 255, 255 },
-};
-
-ColourScheme whiteScheme = {
-	.primaryRGB = { 255, 255, 255 },
-	.secondaryRGB = { 255, 255, 255 },
-	.specularRGB = { 255, 255, 255 },
-};
-
-ColourScheme greyScheme = {
-	.primaryRGB = { 75, 75, 75 },
-	.secondaryRGB = { 75, 75, 75 },
-	.specularRGB = { 75, 75, 75 },
-};
+	Tetromino currentShape;
+	Tetromino nextShape;
+	Gameboard gameboard;
+	int score;
+	int currentLevel;
+	int tetrisRows[4];
+	double timeToMove;
+	int totalLinesCleared;
+	int currentColourIndex;
+} Game;
 
 CubeVisualDesign HollowCubeDesign = {
 	.outerRect = { 0,0, PIXEL_SIZE - 2 * MARGIN, PIXEL_SIZE - 2 * MARGIN },
@@ -272,74 +84,27 @@ CubeVisualDesign ColouredCubeDesign = {
 	.RGBspecularRect = {255, 255, 255 }
 };
 
-typedef struct {
-	Tetromino currentShape;
-	Tetromino nextShape;
-	Gameboard gameboard;
-	int score;
-	int currentLevel;
-	int tetrisRows[4];
-	double timeToMove;
-	int totalLinesCleared;
-	int currentColourIndex;
-} Game;
-
 /* ~ ~ ~ ~ ~ ~ ~ ~ DRAW METHODS ~ ~ ~ ~ ~ ~ ~ ~ */
 
-void drawLetter(SDL_Renderer* renderer, int screenX, int screenY, char letterToDraw) {
-	SDL_SetRenderDrawColor(renderer, 255, 255, 255, SDL_ALPHA_OPAQUE);
-	int letterIndex = -1;
-
-	switch (letterToDraw) {
-		case ' ': return;
-		case 's': {letterIndex = 0; break;}
-		case 'c': {letterIndex = 1; break;}
-		case 'o': {letterIndex = 2; break;}
-		case 'r': {letterIndex = 3; break;}
-		case 'e': {letterIndex = 4; break;}
-		case 'l': {letterIndex = 5; break;}
-		case 'v': {letterIndex = 6; break;}
-	}
-
-	if (letterIndex < 0 || letterIndex > 6) return;
-
-	//draw each rectangle defined in letter mesh
-	for (int i = 0; i < 7; i++) {
-		if (letters[letterIndex][i].x == -1) break;
-		letters[letterIndex][i].x += (screenX + scorePixelSize);
-		letters[letterIndex][i].y += (screenY + scorePixelSize);
-		SDL_RenderDrawRect(renderer, &letters[letterIndex][i]);
-		SDL_RenderFillRect(renderer, &letters[letterIndex][i]);
-		letters[letterIndex][i].x -= (screenX + scorePixelSize);
-		letters[letterIndex][i].y -= (screenY + scorePixelSize);
-	}
-}
-
-void drawNumber(SDL_Renderer* renderer, int screenX, int screenY, int digitToDraw) {
-	SDL_SetRenderDrawColor(renderer, 255, 255, 255, SDL_ALPHA_OPAQUE);
-
-	//draw each rectangle defined in digit mesh
-	for (int i = 0; i < 7; i++) {
-		if (numbers[digitToDraw][i].x == -1) break;
-		numbers[digitToDraw][i].x += (screenX + scorePixelSize);
-		numbers[digitToDraw][i].y += (screenY + scorePixelSize);
-		SDL_RenderDrawRect(renderer, &numbers[digitToDraw][i]);
-		SDL_RenderFillRect(renderer, &numbers[digitToDraw][i]);
-		numbers[digitToDraw][i].x -= (screenX + scorePixelSize);
-		numbers[digitToDraw][i].y -= (screenY + scorePixelSize);
+void fillScoreArray(char* scoreArray, int score) {
+	for (int i = 5; i > -1; i--) {
+		scoreArray[i] = score % 10 + '0';
+		score /= 10;
 	}
 }
 
 void drawScore(SDL_Renderer* renderer, int score) {
-	//char scoreTextArray[6] = { ' ', 'e', 'r', 'o', 'c', 's'};
 	char scoreTextArray[6] = { 's', 'c', 'o', 'r', 'e', ' ' };
+	char scoreArray[6];
 
-	//draw each digit in the current score (from least significant digit to most)
+	fillScoreArray(scoreArray, score);
+
+	for (int i = 0; i < sizeof(scoreTextArray) / sizeof(char); i++) {
+		drawText(renderer, 7 + i * (13), 22 * PIXEL_SIZE, scoreTextArray[i], textPixelSize);
+	}
+
 	for (int i = 0; i < 6; i++) {
-		int digitToDraw = score % 10;
-		score = score / 10;
-		drawNumber(renderer, 7 + (5-i) * (13), 22 * PIXEL_SIZE, digitToDraw);
-		drawLetter(renderer, 7 + (5 - i) * (13), 21 * PIXEL_SIZE, scoreTextArray[5-i]);
+		drawText(renderer, 7 + i * (13), 21 * PIXEL_SIZE, scoreArray[i], textPixelSize);
 	}
 }
 
@@ -412,10 +177,11 @@ void drawLevel(SDL_Renderer* renderer, int currentLevel) {
 	for (int i = 0; i <= 5; i++) {
 		if (i < 2) {
 			int digitToDraw = currentLevel % 10;
-			drawNumber(renderer, 7 + (5 - i) * (13), 23.75 * PIXEL_SIZE, digitToDraw);
+			char charToDraw = digitToDraw + '0';
+			drawText(renderer, 7 + (5 - i) * (13), 23.75 * PIXEL_SIZE, charToDraw, textPixelSize);
 			currentLevel = currentLevel / 10;
 		} else if (i > 2) {
-			drawLetter(renderer, 7 + (5 - i) * (13), 23.75 * PIXEL_SIZE, levelTextArray[i-3]);
+			drawText(renderer, 7 + (5 - i) * (13), 23.75 * PIXEL_SIZE, levelTextArray[i-3], textPixelSize);
 		}
 	}
 }
@@ -520,6 +286,112 @@ void clear(SDL_Renderer* renderer) {
 	SDL_RenderClear(renderer);
 }
 
+void gameOverAnimation(SDL_Renderer* renderer) {
+	char gameText[4] = { 'g','a','m','e' };
+	char overText[4] = { 'o','v','e','r' };
+
+	double startPosX = (COLS / 2) - 4 / 2.0;
+
+	for (int k = 0; k < 12; k++) {
+		clear(renderer);
+		for (int i = 0; i < 4; i++) {
+			drawText(renderer, (startPosX + i) * PIXEL_SIZE, k * PIXEL_SIZE, gameText[i], textPixelSize);
+			drawText(renderer, (startPosX + i) * PIXEL_SIZE, (24 - k) * PIXEL_SIZE, overText[i], textPixelSize);
+		}
+		SDL_RenderPresent(renderer);
+		SDL_Delay(50);
+	}
+
+	SDL_Delay(1000);
+}
+
+void scoreAnimation(SDL_Renderer* renderer, char scoreChars[]) {
+	char scoreText[5] = { 's','c','o','r','e' };
+
+	double startPosXText = (COLS / 2) - 5 / 2.0;
+	double startPosXScore = (COLS / 2) - 6 / 2.0;
+
+	for (int k = 0; k <= 10; k++) {
+		clear(renderer);
+		for (int i = 0; i < 5; i++) {
+			drawText(renderer, (startPosXText - 5 + k / 2.0 + i) * PIXEL_SIZE, 11 * PIXEL_SIZE, scoreText[i], textPixelSize);
+		}
+		for (int i = 0; i < 6; i++) {
+			drawText(renderer, (startPosXScore + 5 - k / 2.0 + i) * PIXEL_SIZE, 13 * PIXEL_SIZE, scoreChars[i], textPixelSize);
+		}
+		SDL_RenderPresent(renderer);
+		SDL_Delay(50);
+	}
+
+	SDL_Delay(1000);
+}
+
+void exitLoop(SDL_Renderer* renderer, int* playing, char scoreChars[]) {
+	char scoreText[5] = { 's','c','o','r','e' };
+	char pressText[5] = { 'p','r','e','s','s' };
+	char spaceText[5] = { 's','p','a','c','e' };
+	char continueText[11] = { 't','o',' ','c','o','n','t','i','n','u','e' };
+
+	int flashOn = 1;
+	clock_t lastUpdate = clock();
+
+	while (*playing == 1) {
+		clock_t now = clock();
+		if ((double)(now - lastUpdate) / CLOCKS_PER_SEC >= 0.7) {
+			clear(renderer);
+
+			for (int i = 0; i < 5; i++) {
+				drawText(renderer, (2.5 + i) * PIXEL_SIZE, 11 * PIXEL_SIZE, scoreText[i], textPixelSize);
+			}
+
+			for (int i = 0; i < 6; i++) {
+				drawText(renderer, (2 + i) * PIXEL_SIZE, 13 * PIXEL_SIZE, scoreChars[i], textPixelSize);
+			}
+
+			for (int i = 0; i < 5; i++) {
+				drawText(renderer, (3.75 + i / 2.0) * PIXEL_SIZE, 21.5 * PIXEL_SIZE, pressText[i], 1);
+			}
+
+			for (int i = 0; i < 11; i++) {
+				drawText(renderer, (2.25 + i / 2.0) * PIXEL_SIZE, 23.5 * PIXEL_SIZE, continueText[i], 1);
+			}
+
+			if (flashOn) {
+				for (int i = 0; i < 5; i++) {
+					drawText(renderer, (3.75 + i / 2.0) * PIXEL_SIZE, 22.5 * PIXEL_SIZE, spaceText[i], 1);
+				}
+				flashOn = 0;
+			} else {
+				flashOn = 1;
+			}
+
+			lastUpdate = now;
+			SDL_RenderPresent(renderer);
+		}
+
+		SDL_Event event;
+		while (SDL_PollEvent(&event)) {
+			if (event.type == SDL_QUIT || event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE) {
+				*playing = -1;
+				return;
+			}
+			else if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_SPACE) {
+				*playing = 1;
+				return;
+			}
+		}
+		SDL_Delay(100);
+	}
+}
+
+void gameOverScreen(SDL_Renderer* renderer, int* playing, int score) {
+	char scoreChars[6];
+	fillScoreArray(scoreChars, score);
+	gameOverAnimation(renderer);
+	scoreAnimation(renderer, scoreChars);
+	exitLoop(renderer, playing, scoreChars);
+}
+
 /* ~ ~ ~ ~ ~ ~ ~ ~ UPDATE METHODS ~ ~ ~ ~ ~ ~ ~ ~ */
 
 void setNextShape(Tetromino* nextShape) {
@@ -590,7 +462,7 @@ Game* createGame(int numRows, int numCols) {
 	game->score = 0;
 	game->currentLevel = 1;
 	game->totalLinesCleared = 0;
-	game->currentColourIndex = 4;
+	game->currentColourIndex = 0;
 
 	for (int i = 0; i < sizeof(*game->tetrisRows); i++) {
 		game->tetrisRows[i] = -1;
@@ -811,87 +683,152 @@ SDL_Renderer* initGraphicsAndGetRenderer() {
 		return 0;
 	}
 
-	SDL_Surface* screen = SDL_GetWindowSurface(window);
-	if (!screen) {
-		printf("Error creating surface\n");
-		SDL_DestroyRenderer(renderer);
-		SDL_DestroyWindow(window);
-		SDL_Quit();
-		return 0;
+SDL_Surface* screen = SDL_GetWindowSurface(window);
+if (!screen) {
+	printf("Error creating surface\n");
+	SDL_DestroyRenderer(renderer);
+	SDL_DestroyWindow(window);
+	SDL_Quit();
+	return 0;
+}
+
+return renderer;
+}
+
+void drawCredits(SDL_Renderer* renderer) {
+	char credits[12] = { 'g','a','m','e',' ','&',' ','m','u','s','i','c' };
+	char by[2] = { 'b','y' };
+	char name[11] = { 't','o','m',' ','l','e','g','g','e','t','t' };
+
+	double startXPos = 5 - 12 / 4.0;
+	for (int i = 0; i < 12; i++) {
+		drawText(renderer, (startXPos + i / 2.0) * PIXEL_SIZE, 22 * PIXEL_SIZE, credits[i], 1);
 	}
 
-	return renderer;
+	startXPos = 5 - 2 / 4.0;
+	for (int i = 0; i < 2; i++) {
+		drawText(renderer, (startXPos + i / 2.0) * PIXEL_SIZE, 23 * PIXEL_SIZE, by[i], 1);
+	}
+
+	startXPos = 5 - 11 / 4.0;
+	for (int i = 0; i < 11; i++) {
+		drawText(renderer, (startXPos + i / 2.0) * PIXEL_SIZE, 24 * PIXEL_SIZE, name[i], 1);
+	}
 }
 
-ColourScheme* createColoursArray(int size, ColourScheme redScheme, ColourScheme greenScheme, ColourScheme blueScheme, ColourScheme whiteScheme, ColourScheme greyScheme) {
-	ColourScheme* colours = malloc(sizeof(ColourScheme) * size);
-
-	colours[0] = redScheme;
-	colours[1] = greenScheme;
-	colours[2] = blueScheme;
-	colours[3] = whiteScheme;
-	colours[4] = greyScheme;
-	return colours;
+void drawTitle(SDL_Renderer* renderer) {
+	char tetrisText[6] = { 't','e','t','r','i','s' };
+	for (int i = 0; i < 6; i++) {
+		drawText(renderer, (2 + i) * PIXEL_SIZE, 1 * PIXEL_SIZE, tetrisText[i], 3);
+	}
 }
 
-void destroyColoursArray(ColourScheme* colours) {
-	free(colours);
+void drawPressEnterToStart(SDL_Renderer* renderer) {
+	char pressEnterText[11] = { 'p','r','e','s','s',' ','e','n','t','e','r' };
+	char toStartText[8] = { 't','o',' ','s','t','a','r','t' };
+	double startXPos = 5 - 11 / 4.0;
+
+	for (int i = 0; i < 11; i++) {
+		drawText(renderer, (startXPos + i/2.0) * PIXEL_SIZE, 11.5 * PIXEL_SIZE, pressEnterText[i], 1);
+	}
+
+	startXPos = 5 - 8 / 4.0;
+	for (int i = 0; i < 8; i++) {
+		drawText(renderer, (startXPos + i/2.0) * PIXEL_SIZE, 12.5 * PIXEL_SIZE, toStartText[i], 1);
+	}
 }
 
-/* ~ ~ ~ ~ ~ ~ ~ ~ MAIN METHOD ~ ~ ~ ~ ~ ~ ~ ~ */
+void lobbyLoop(SDL_Renderer* renderer) {
+	clear(renderer);
+	drawTitle(renderer);
+	drawCredits(renderer);
+	drawPressEnterToStart(renderer);
+	SDL_RenderPresent(renderer);
+	SDL_Delay(500);
 
-int main(int argc, char* args[]) {
-	ColourScheme* colours = createColoursArray(NUM_COLOUR_SCHEMES, redScheme, greenScheme, blueScheme, whiteScheme, greyScheme);
+	// music off/on
+	// starting level 1-14
+	// press ENTER to start
+	// <- / ->  clockwise/anticlockwise rotations
+	// a / d    move left / right
+	// spacebar -- dropdown
+}
+
+void gameLoop(SDL_Renderer* renderer, ColourScheme colours[], int* playing) {
 	Game* game = createGame(ROWS, COLS);
-	SDL_Renderer* renderer = initGraphicsAndGetRenderer();
-	srand(time(NULL));		//sets new seed for random number generator;
-
-	int playing = 1;
 	clock_t lastUpdate = clock();
 
-	while (playing) {
+	while (*playing) {
 		SDL_Event event;
 		while (SDL_PollEvent(&event)) {
-			if (event.type == SDL_QUIT) {
-				playing = 0;
+			if (event.type == SDL_QUIT || event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE) {
+				*playing = -1;
+				DeinitGameboard(&game->gameboard);
+				destroyGame(game);
+				return;
 			}
 			else if (event.type == SDL_KEYDOWN) {
 				switch (event.key.keysym.sym) {
-					case SDLK_ESCAPE: {playing = 0; break;}
-					case SDLK_a: { if(isValidMove(&game->currentShape, &game->gameboard, 'L')) game->currentShape.x--; break;}
-					case SDLK_d: { if (isValidMove(&game->currentShape, &game->gameboard, 'R'))  game->currentShape.x++; break;}
-					case SDLK_s: { if (isValidMove(&game->currentShape, &game->gameboard, 'D'))  game->currentShape.y++; break;}
-					case SDLK_SPACE: { while(isValidMove(&game->currentShape, &game->gameboard, 'D'))  game->currentShape.y++; break;}
-					case SDLK_RIGHT: { if (isValidMove(&game->currentShape, &game->gameboard, 'C')) {
-						game->currentShape.currentRotation = (( game->currentShape.currentRotation + 1) % NUM_ROTATIONS + NUM_ROTATIONS) % NUM_ROTATIONS;
-						break;}
-					}
-					case SDLK_LEFT: { if (isValidMove(&game->currentShape, &game->gameboard, 'A')) {
-						game->currentShape.currentRotation = ((game->currentShape.currentRotation - 1) % NUM_ROTATIONS + NUM_ROTATIONS) % NUM_ROTATIONS;
-						break;}
-					}
+				case SDLK_a: { if (isValidMove(&game->currentShape, &game->gameboard, 'L')) game->currentShape.x--; break;}
+				case SDLK_d: { if (isValidMove(&game->currentShape, &game->gameboard, 'R'))  game->currentShape.x++; break;}
+				case SDLK_s: { if (isValidMove(&game->currentShape, &game->gameboard, 'D'))  game->currentShape.y++; break;}
+				case SDLK_SPACE: { while (isValidMove(&game->currentShape, &game->gameboard, 'D'))  game->currentShape.y++; break;}
+				case SDLK_RIGHT: { if (isValidMove(&game->currentShape, &game->gameboard, 'C')) {
+					game->currentShape.currentRotation = ((game->currentShape.currentRotation + 1) % NUM_ROTATIONS + NUM_ROTATIONS) % NUM_ROTATIONS;
+					break;
+				}
+				}
+				case SDLK_LEFT: { if (isValidMove(&game->currentShape, &game->gameboard, 'A')) {
+					game->currentShape.currentRotation = ((game->currentShape.currentRotation - 1) % NUM_ROTATIONS + NUM_ROTATIONS) % NUM_ROTATIONS;
+					break;
+				}
+				}
 				}
 			}
 		}
 
 		clock_t currentTime = clock();
-		
+
 		if (!update(game, (double)(currentTime - lastUpdate) / CLOCKS_PER_SEC)) {
 			//end-game conditions met
-			break;
+			DeinitGameboard(&game->gameboard);
+			gameOverScreen(renderer, playing, game->score);
+			destroyGame(game);
+			SDL_Delay(500);
+			return;
 		}
 		if (game->tetrisRows[0] != -1) {
 			animateAndClearTetrisRows(renderer, game->tetrisRows);
 		}
 		lastUpdate = currentTime;
-		clear(renderer);  
+		clear(renderer);
 		draw(renderer, game, colours[game->currentColourIndex]);
 		SDL_Delay(20);
 	}
+}
+
+
+
+/* ~ ~ ~ ~ ~ ~ ~ ~ MAIN METHOD ~ ~ ~ ~ ~ ~ ~ ~ */
+
+int main(int argc, char* args[]) {
+	ColourScheme* colours = createColoursArray(NUM_COLOUR_SCHEMES, redScheme, greenScheme, blueScheme, whiteScheme, greyScheme);
+	
+	SDL_Renderer* renderer = initGraphicsAndGetRenderer();
+	
+	int playing = 1;      //-1 --> exit,   0 --> in lobby,  1 --> in game
+
+	while (playing != -1) {
+		if (playing == 0) {
+			lobbyLoop(renderer);
+		} else if (playing == 1) {
+			srand(time(NULL));		//sets new seed for random number generator;
+			gameLoop(renderer, colours, &playing);
+			//gameOverScreen(renderer, &playing, 123456);
+		}
+	}
 	printf("\n\n\n~~~~~~~ G A M E   O V E R ~~~~~~~\n\n\n");
 	SDL_DestroyRenderer(renderer);
-	DeinitGameboard(&game->gameboard);
-	destroyGame(game);
 	destroyColoursArray(colours);
 	SDL_Quit();
 	return 1;
