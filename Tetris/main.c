@@ -18,6 +18,13 @@
 #define BORDER PIXEL_SIZE / 10
 #define textPixelSize 2
 
+typedef struct {
+	int musicOn;
+	int startLevel;
+	int appState;
+	int lastScore;
+} Settings;
+
 const short shapeRotations[7][4] = {
 		{ 0b0000011001100000, 0b0000011001100000, 0b0000011001100000, 0b0000011001100000 }, //Square, 0 rotations
 		{ 0b0000111100000000, 0b0010001000100010, 0b0000111100000000, 0b0010001000100010 }, //I, 2 rotations, default is horitzonal
@@ -84,7 +91,30 @@ CubeVisualDesign ColouredCubeDesign = {
 	.RGBspecularRect = {255, 255, 255 }
 };
 
+Settings* createSettings() {
+	Settings* settings = malloc(sizeof(Settings));
+	settings->musicOn = 1;
+	settings->startLevel = 12;
+	settings->appState = 0;
+	settings->lastScore = 0;
+	return settings;
+}
+
+void destroySettings(Settings* settings) {
+	free(settings);
+}
+
 /* ~ ~ ~ ~ ~ ~ ~ ~ DRAW METHODS ~ ~ ~ ~ ~ ~ ~ ~ */
+
+void drawString(SDL_Renderer* renderer, char charArray[], int strLength, float startXPos, float yPos, int fontSize, Colour colour) {
+	double spaceBetweenChars = 1;
+	if (fontSize == 2) spaceBetweenChars = 0.65;
+	else if (fontSize == 1) spaceBetweenChars = 0.5;
+
+	for (int i = 0; i < strLength; i++) {
+		drawText(renderer, (startXPos + i * (spaceBetweenChars)) * PIXEL_SIZE, yPos * PIXEL_SIZE, charArray[i], fontSize, colour);
+	}
+}
 
 void fillScoreArray(char* scoreArray, int score) {
 	for (int i = 5; i > -1; i--) {
@@ -94,21 +124,13 @@ void fillScoreArray(char* scoreArray, int score) {
 }
 
 void drawScore(SDL_Renderer* renderer, int score) {
-	char scoreTextArray[6] = { 's', 'c', 'o', 'r', 'e', ' ' };
 	char scoreArray[6];
-
 	fillScoreArray(scoreArray, score);
-
-	for (int i = 0; i < sizeof(scoreTextArray) / sizeof(char); i++) {
-		drawText(renderer, 7 + i * (13), 22 * PIXEL_SIZE, scoreTextArray[i], textPixelSize);
-	}
-
-	for (int i = 0; i < 6; i++) {
-		drawText(renderer, 7 + i * (13), 21 * PIXEL_SIZE, scoreArray[i], textPixelSize);
-	}
+	drawString(renderer, "score", 5, 0.25, 21, 2, white);
+	drawString(renderer, scoreArray, 6, 0.25, 22, 2, white);
 }
 
-void drawShape(SDL_Renderer* renderer, Tetromino currentShape, int screenX, int screenY, ColourScheme currentColour) {
+void drawShape(SDL_Renderer* renderer, Tetromino currentShape, int screenX, int screenY, ColourScheme colourScheme) {
 	short bitmap = currentShape.rotations[currentShape.currentRotation];
 
 	unsigned short bitmask = 0b1000000000000000;
@@ -117,19 +139,19 @@ void drawShape(SDL_Renderer* renderer, Tetromino currentShape, int screenX, int 
 			if (bitmask & bitmap) {
 				HollowCubeDesign.outerRect.x = screenX + j * PIXEL_SIZE + MARGIN;
 				HollowCubeDesign.outerRect.y = screenY + i * PIXEL_SIZE + MARGIN;
-				SDL_SetRenderDrawColor(renderer, currentColour.primaryRGB[0], currentColour.primaryRGB[1], currentColour.primaryRGB[2], SDL_ALPHA_OPAQUE);
+				SDL_SetRenderDrawColor(renderer, colourScheme.primary.r, colourScheme.primary.g, colourScheme.primary.g, SDL_ALPHA_OPAQUE);
 				SDL_RenderDrawRect(renderer, &HollowCubeDesign.outerRect);
 				SDL_RenderFillRect(renderer, &HollowCubeDesign.outerRect);
 				
 				HollowCubeDesign.innerRect.x = screenX + j * PIXEL_SIZE + BORDER + MARGIN;
 				HollowCubeDesign.innerRect.y = screenY + i * PIXEL_SIZE + BORDER + MARGIN;
-				SDL_SetRenderDrawColor(renderer, currentColour.secondaryRGB[0], currentColour.secondaryRGB[1], currentColour.secondaryRGB[2], SDL_ALPHA_OPAQUE);
+				SDL_SetRenderDrawColor(renderer, colourScheme.secondary.r, colourScheme.secondary.g, colourScheme.secondary.b, SDL_ALPHA_OPAQUE);
 				SDL_RenderDrawRect(renderer, &HollowCubeDesign.innerRect);
 				SDL_RenderFillRect(renderer, &HollowCubeDesign.innerRect);
 
 				HollowCubeDesign.specularRect.x = screenX + j * PIXEL_SIZE + MARGIN;
 				HollowCubeDesign.specularRect.y = screenY + i * PIXEL_SIZE + MARGIN;
-				SDL_SetRenderDrawColor(renderer, currentColour.specularRGB[0], currentColour.specularRGB[1], currentColour.specularRGB[2], SDL_ALPHA_OPAQUE);
+				SDL_SetRenderDrawColor(renderer, colourScheme.specular.r, colourScheme.specular.g, colourScheme.specular.b, SDL_ALPHA_OPAQUE);
 				SDL_RenderDrawRect(renderer, &HollowCubeDesign.specularRect);
 				SDL_RenderFillRect(renderer, &HollowCubeDesign.specularRect);
 			}
@@ -138,20 +160,20 @@ void drawShape(SDL_Renderer* renderer, Tetromino currentShape, int screenX, int 
 	}
 }
 
-void drawBoard(SDL_Renderer* renderer, Gameboard gameboard, ColourScheme currentColour) {
+void drawBoard(SDL_Renderer* renderer, Gameboard gameboard, ColourScheme colourScheme) {
 	for (int i = 0; i < gameboard.numGameRows; i++) {
 		unsigned short bitmask = 0b1000000000;
 		for (int j = 0; j < gameboard.numGameCols; j++) {
 			if (bitmask & gameboard.cells[i + HIDDEN_ROWS]) {
 				ColouredCubeDesign.outerRect.x = j * PIXEL_SIZE + MARGIN;
 				ColouredCubeDesign.outerRect.y = i * PIXEL_SIZE + MARGIN;
-				SDL_SetRenderDrawColor(renderer, currentColour.primaryRGB[0], currentColour.primaryRGB[1], currentColour.primaryRGB[2], SDL_ALPHA_OPAQUE);
+				SDL_SetRenderDrawColor(renderer, colourScheme.primary.r, colourScheme.primary.g, colourScheme.primary.g, SDL_ALPHA_OPAQUE);
 				SDL_RenderDrawRect(renderer, &ColouredCubeDesign.outerRect);
 				SDL_RenderFillRect(renderer, &ColouredCubeDesign.outerRect);
 
 				ColouredCubeDesign.innerRect.x = j * PIXEL_SIZE + BORDER + MARGIN;
 				ColouredCubeDesign.innerRect.y = i * PIXEL_SIZE + BORDER + MARGIN;
-				SDL_SetRenderDrawColor(renderer, currentColour.secondaryRGB[0], currentColour.secondaryRGB[1], currentColour.secondaryRGB[2], SDL_ALPHA_OPAQUE);
+				SDL_SetRenderDrawColor(renderer, colourScheme.secondary.r, colourScheme.secondary.g, colourScheme.secondary.b, SDL_ALPHA_OPAQUE);
 				SDL_RenderDrawRect(renderer, &ColouredCubeDesign.innerRect);
 				SDL_RenderFillRect(renderer, &ColouredCubeDesign.innerRect);
 
@@ -162,7 +184,7 @@ void drawBoard(SDL_Renderer* renderer, Gameboard gameboard, ColourScheme current
 
 				ColouredCubeDesign.specularRect.x = j * PIXEL_SIZE + MARGIN;
 				ColouredCubeDesign.specularRect.y = i * PIXEL_SIZE + MARGIN;
-				SDL_SetRenderDrawColor(renderer, currentColour.specularRGB[0], currentColour.specularRGB[1], currentColour.specularRGB[2], SDL_ALPHA_OPAQUE);
+				SDL_SetRenderDrawColor(renderer, colourScheme.specular.r, colourScheme.specular.g, colourScheme.specular.b, SDL_ALPHA_OPAQUE);
 				SDL_RenderDrawRect(renderer, &ColouredCubeDesign.specularRect);
 				SDL_RenderFillRect(renderer, &ColouredCubeDesign.specularRect);
 			}
@@ -172,18 +194,9 @@ void drawBoard(SDL_Renderer* renderer, Gameboard gameboard, ColourScheme current
 }
 
 void drawLevel(SDL_Renderer* renderer, int currentLevel) {
-	char levelTextArray[3] = { 'l','v','l' };
-
-	for (int i = 0; i <= 5; i++) {
-		if (i < 2) {
-			int digitToDraw = currentLevel % 10;
-			char charToDraw = digitToDraw + '0';
-			drawText(renderer, 7 + (5 - i) * (13), 23.75 * PIXEL_SIZE, charToDraw, textPixelSize);
-			currentLevel = currentLevel / 10;
-		} else if (i > 2) {
-			drawText(renderer, 7 + (5 - i) * (13), 23.75 * PIXEL_SIZE, levelTextArray[i-3], textPixelSize);
-		}
-	}
+	char levelArray[2] = { currentLevel / 10 + '0',currentLevel % 10 + '0'};
+	drawString(renderer, "lvl", 3, 0.25, 23.75, 2, white);
+	drawString(renderer, levelArray, 2, 2.9, 23.75, 2, white);
 }
 
 void drawStats(SDL_Renderer* renderer) {
@@ -210,13 +223,13 @@ void drawStats(SDL_Renderer* renderer) {
 	return;
 }
 
-void drawCurrentShape(SDL_Renderer* renderer, Tetromino currentShape, ColourScheme currentColour) {
+void drawCurrentShape(SDL_Renderer* renderer, Tetromino currentShape, ColourScheme colourScheme) {
 	int screenX = currentShape.x * PIXEL_SIZE;
 	int screenY = currentShape.y * PIXEL_SIZE;
-	drawShape(renderer, currentShape, screenX, screenY, currentColour);
+	drawShape(renderer, currentShape, screenX, screenY, colourScheme);
 }
 
-void drawNextShape(SDL_Renderer* renderer, Tetromino nextShape, ColourScheme currentColour) {
+void drawNextShape(SDL_Renderer* renderer, Tetromino nextShape, ColourScheme colourScheme) {
 	int previewXpos = 123;
 	int previewYpos = 415;
 
@@ -229,7 +242,7 @@ void drawNextShape(SDL_Renderer* renderer, Tetromino nextShape, ColourScheme cur
 		previewYpos += PIXEL_SIZE / 2;
 	}
 
-	drawShape(renderer, nextShape, previewXpos, previewYpos, currentColour);
+	drawShape(renderer, nextShape, previewXpos, previewYpos, colourScheme);
 }
 
 void animateAndClearTetrisRows(SDL_Renderer* renderer, int tetrisRows[]) {
@@ -265,7 +278,7 @@ void animateAndClearTetrisRows(SDL_Renderer* renderer, int tetrisRows[]) {
 	resetTetrisRows(tetrisRows);
 }
 
-void draw(SDL_Renderer* renderer, Game* game, ColourScheme currentColour) {
+void draw(SDL_Renderer* renderer, Game* game, ColourScheme colourScheme) {
 	Gameboard gameboard = game->gameboard;
 	Tetromino currentShape = game->currentShape;
 	Tetromino nextShape = game->nextShape;
@@ -273,9 +286,9 @@ void draw(SDL_Renderer* renderer, Game* game, ColourScheme currentColour) {
 	int currentLevel = game->currentLevel;
 
 	drawStats(renderer);
-	drawBoard(renderer, gameboard, currentColour);
-	drawCurrentShape(renderer, currentShape, currentColour);
-	drawNextShape(renderer, nextShape, currentColour);
+	drawBoard(renderer, gameboard, colourScheme);
+	drawCurrentShape(renderer, currentShape, colourScheme);
+	drawNextShape(renderer, nextShape, colourScheme);
 	drawScore(renderer, score);
 	drawLevel(renderer, currentLevel);
 	SDL_RenderPresent(renderer);
@@ -287,109 +300,71 @@ void clear(SDL_Renderer* renderer) {
 }
 
 void gameOverAnimation(SDL_Renderer* renderer) {
-	char gameText[4] = { 'g','a','m','e' };
-	char overText[4] = { 'o','v','e','r' };
-
-	double startPosX = (COLS / 2) - 4 / 2.0;
-
 	for (int k = 0; k < 12; k++) {
 		clear(renderer);
-		for (int i = 0; i < 4; i++) {
-			drawText(renderer, (startPosX + i) * PIXEL_SIZE, k * PIXEL_SIZE, gameText[i], textPixelSize);
-			drawText(renderer, (startPosX + i) * PIXEL_SIZE, (24 - k) * PIXEL_SIZE, overText[i], textPixelSize);
-		}
+		drawString(renderer, "game", 4, 3, k, 3, white);
+		drawString(renderer, "over", 4, 3, 24 - k, 3, white);
 		SDL_RenderPresent(renderer);
 		SDL_Delay(50);
 	}
-
 	SDL_Delay(1000);
 }
 
-void scoreAnimation(SDL_Renderer* renderer, char scoreChars[]) {
-	char scoreText[5] = { 's','c','o','r','e' };
-
-	double startPosXText = (COLS / 2) - 5 / 2.0;
-	double startPosXScore = (COLS / 2) - 6 / 2.0;
-
+void scoreAnimation(SDL_Renderer* renderer, char scoreArray[]) {
 	for (int k = 0; k <= 10; k++) {
 		clear(renderer);
-		for (int i = 0; i < 5; i++) {
-			drawText(renderer, (startPosXText - 5 + k / 2.0 + i) * PIXEL_SIZE, 11 * PIXEL_SIZE, scoreText[i], textPixelSize);
-		}
-		for (int i = 0; i < 6; i++) {
-			drawText(renderer, (startPosXScore + 5 - k / 2.0 + i) * PIXEL_SIZE, 13 * PIXEL_SIZE, scoreChars[i], textPixelSize);
-		}
+		drawString(renderer, "score", 5, - 2.5 + k / 2.0, 11, 3, white);
+		drawString(renderer, scoreArray, 6, 7 - k / 2.0, 13, 3, white);
 		SDL_RenderPresent(renderer);
 		SDL_Delay(50);
 	}
-
 	SDL_Delay(1000);
 }
 
-void exitLoop(SDL_Renderer* renderer, int* playing, char scoreChars[]) {
-	char scoreText[5] = { 's','c','o','r','e' };
-	char pressText[5] = { 'p','r','e','s','s' };
-	char spaceText[5] = { 's','p','a','c','e' };
-	char continueText[11] = { 't','o',' ','c','o','n','t','i','n','u','e' };
-
+void exitLoop(SDL_Renderer* renderer, char scoreArray[], Settings* settings) {
 	int flashOn = 1;
 	clock_t lastUpdate = clock();
+	while (settings->appState == 3) {
+		SDL_Event event;
+		while (SDL_PollEvent(&event)) {
+			if (event.type == SDL_QUIT || event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE) {
+				settings->appState = -1;
+				return;
+			}
+			else if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_RETURN) {
+				settings->appState = 0;
+				return;
+			}
+		}
 
-	while (*playing == 1) {
 		clock_t now = clock();
 		if ((double)(now - lastUpdate) / CLOCKS_PER_SEC >= 0.7) {
 			clear(renderer);
 
-			for (int i = 0; i < 5; i++) {
-				drawText(renderer, (2.5 + i) * PIXEL_SIZE, 11 * PIXEL_SIZE, scoreText[i], textPixelSize);
-			}
-
-			for (int i = 0; i < 6; i++) {
-				drawText(renderer, (2 + i) * PIXEL_SIZE, 13 * PIXEL_SIZE, scoreChars[i], textPixelSize);
-			}
-
-			for (int i = 0; i < 5; i++) {
-				drawText(renderer, (3.75 + i / 2.0) * PIXEL_SIZE, 21.5 * PIXEL_SIZE, pressText[i], 1);
-			}
-
-			for (int i = 0; i < 11; i++) {
-				drawText(renderer, (2.25 + i / 2.0) * PIXEL_SIZE, 23.5 * PIXEL_SIZE, continueText[i], 1);
-			}
-
 			if (flashOn) {
-				for (int i = 0; i < 5; i++) {
-					drawText(renderer, (3.75 + i / 2.0) * PIXEL_SIZE, 22.5 * PIXEL_SIZE, spaceText[i], 1);
-				}
+				drawString(renderer, "enter", 5, 3.75, 22.5, 1, white);
 				flashOn = 0;
 			} else {
 				flashOn = 1;
 			}
 
+			drawString(renderer, "score", 5, 2.5, 11, 3, white);
+			drawString(renderer, scoreArray, 6, 2, 13, 3, white);
+			drawString(renderer, "press", 5, 3.75, 21.5, 1, white);
+			drawString(renderer, "to continue", 11, 2.25, 23.5, 1, white);
 			lastUpdate = now;
 			SDL_RenderPresent(renderer);
-		}
-
-		SDL_Event event;
-		while (SDL_PollEvent(&event)) {
-			if (event.type == SDL_QUIT || event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE) {
-				*playing = -1;
-				return;
-			}
-			else if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_SPACE) {
-				*playing = 1;
-				return;
-			}
 		}
 		SDL_Delay(100);
 	}
 }
 
-void gameOverScreen(SDL_Renderer* renderer, int* playing, int score) {
+void gameOverScreen(SDL_Renderer* renderer, Settings* settings) {
 	char scoreChars[6];
-	fillScoreArray(scoreChars, score);
+	fillScoreArray(scoreChars, settings->lastScore);
 	gameOverAnimation(renderer);
 	scoreAnimation(renderer, scoreChars);
-	exitLoop(renderer, playing, scoreChars);
+	exitLoop(renderer, scoreChars, settings);
 }
 
 /* ~ ~ ~ ~ ~ ~ ~ ~ UPDATE METHODS ~ ~ ~ ~ ~ ~ ~ ~ */
@@ -450,7 +425,7 @@ void initGameboard(Gameboard* gameboard, int rows, int cols) {
 	return;
 }
 
-Game* createGame(int numRows, int numCols) {
+Game* createGame(int numRows, int numCols, int startLevel) {
 	Game* game = malloc(sizeof(Game));
 
 	game->currentShape.shapeType = -1;    //initialize to -1 (no tetromino type defined yet)
@@ -460,7 +435,7 @@ Game* createGame(int numRows, int numCols) {
 	game->timeToMove = 0;
 
 	game->score = 0;
-	game->currentLevel = 1;
+	game->currentLevel = startLevel;
 	game->totalLinesCleared = 0;
 	game->currentColourIndex = 0;
 
@@ -668,7 +643,7 @@ SDL_Renderer* initGraphicsAndGetRenderer() {
 		return 0;
 	}
 
-	SDL_Window* window = SDL_CreateWindow("Tetris In C ~ Tom Leggett", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, COLS * PIXEL_SIZE, (ROWS + STATS_ROWS + 2) * PIXEL_SIZE, 0);
+	SDL_Window* window = SDL_CreateWindow("", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, COLS * PIXEL_SIZE, (ROWS + STATS_ROWS + 2) * PIXEL_SIZE, 0);
 	if (!window) {
 		printf("Error Creating Window: %s\n", SDL_GetError());
 		SDL_Quit();
@@ -696,73 +671,189 @@ return renderer;
 }
 
 void drawCredits(SDL_Renderer* renderer) {
-	char credits[12] = { 'g','a','m','e',' ','&',' ','m','u','s','i','c' };
-	char by[2] = { 'b','y' };
-	char name[11] = { 't','o','m',' ','l','e','g','g','e','t','t' };
-
-	double startXPos = 5 - 12 / 4.0;
-	for (int i = 0; i < 12; i++) {
-		drawText(renderer, (startXPos + i / 2.0) * PIXEL_SIZE, 22 * PIXEL_SIZE, credits[i], 1);
-	}
-
-	startXPos = 5 - 2 / 4.0;
-	for (int i = 0; i < 2; i++) {
-		drawText(renderer, (startXPos + i / 2.0) * PIXEL_SIZE, 23 * PIXEL_SIZE, by[i], 1);
-	}
-
-	startXPos = 5 - 11 / 4.0;
-	for (int i = 0; i < 11; i++) {
-		drawText(renderer, (startXPos + i / 2.0) * PIXEL_SIZE, 24 * PIXEL_SIZE, name[i], 1);
-	}
+	drawString(renderer, "game & music", 12, 2, 22, 1, white);
+	drawString(renderer, "by", 2, 4.5, 23, 1, white);
+	drawString(renderer, "tom leggett", 11, 2.25, 24, 1, white);
 }
 
 void drawTitle(SDL_Renderer* renderer) {
-	char tetrisText[6] = { 't','e','t','r','i','s' };
-	for (int i = 0; i < 6; i++) {
-		drawText(renderer, (2 + i) * PIXEL_SIZE, 1 * PIXEL_SIZE, tetrisText[i], 3);
-	}
+	int xPos = 2;
+	int yPos = 1;
+	drawString(renderer, "tetris", 6, xPos, yPos, 3, white);
 }
 
 void drawPressEnterToStart(SDL_Renderer* renderer) {
-	char pressEnterText[11] = { 'p','r','e','s','s',' ','e','n','t','e','r' };
-	char toStartText[8] = { 't','o',' ','s','t','a','r','t' };
-	double startXPos = 5 - 11 / 4.0;
+	double xPos = 5 - 11 / 4.0;
+	double yPos = 12;
+	drawString(renderer, "press enter", 11, xPos, yPos, 1, white);
+}
 
-	for (int i = 0; i < 11; i++) {
-		drawText(renderer, (startXPos + i/2.0) * PIXEL_SIZE, 11.5 * PIXEL_SIZE, pressEnterText[i], 1);
-	}
-
-	startXPos = 5 - 8 / 4.0;
-	for (int i = 0; i < 8; i++) {
-		drawText(renderer, (startXPos + i/2.0) * PIXEL_SIZE, 12.5 * PIXEL_SIZE, toStartText[i], 1);
+void fillLevelCharArray(char level[], int startLevel) {
+	if (level < 10) {
+		level[0] = startLevel % 10 + '0';
+		level[1] = ' ';
+	} else {
+		level[0] = startLevel / 10 + '0';
+		level[1] = startLevel % 10 + '0';
 	}
 }
 
-void lobbyLoop(SDL_Renderer* renderer) {
-	clear(renderer);
-	drawTitle(renderer);
-	drawCredits(renderer);
-	drawPressEnterToStart(renderer);
-	SDL_RenderPresent(renderer);
-	SDL_Delay(500);
-
-	// music off/on
-	// starting level 1-14
-	// press ENTER to start
-	// <- / ->  clockwise/anticlockwise rotations
-	// a / d    move left / right
-	// spacebar -- dropdown
+void fillMusicCharArray(char musicSetting[], int musicOn) {
+	if (musicOn) {
+		musicSetting[0] = 'o';
+		musicSetting[1] = 'n';
+		musicSetting[2] = ' ';
+	} else {
+		musicSetting[0] = 'o';
+		musicSetting[1] = 'f';
+		musicSetting[2] = 'f';
+	}
 }
 
-void gameLoop(SDL_Renderer* renderer, ColourScheme colours[], int* playing) {
-	Game* game = createGame(ROWS, COLS);
+void drawAllSettings(SDL_Renderer* renderer, Settings* settings, int focus) {
+	char levelSetting[2];
+	char musicSetting[3];
+	fillLevelCharArray(levelSetting, settings->startLevel);
+	fillMusicCharArray(musicSetting, settings->musicOn);
+
+	drawString(renderer, "music", 5, 2.5, 9, 1, white);
+	drawString(renderer, "settings", 8, 3, 6, 1, white);
+	drawString(renderer, "level", 5, 2.5, 8, 1, white);
+	drawString(renderer, musicSetting, 3, 6, 9, 1, white);
+	drawString(renderer, levelSetting, 2, 6, 8, 1, white);
+	
+	SDL_Rect levelSettingRect = { 6 * PIXEL_SIZE, 8 * PIXEL_SIZE, 2 * 0.45 * PIXEL_SIZE, 0.5 * PIXEL_SIZE };
+	SDL_Rect musicSettingRect = { 6 * PIXEL_SIZE, 9 * PIXEL_SIZE, 2 * 0.45 * PIXEL_SIZE, 0.5 * PIXEL_SIZE };
+
+	if (focus == 0) {
+		SDL_RenderDrawRect(renderer, &levelSettingRect);
+		SDL_RenderFillRect(renderer, &levelSettingRect);
+		drawString(renderer, levelSetting, 2, 6, 8, 1, black);
+	}
+	else {
+		if (!settings->musicOn) {
+			musicSettingRect.w += 0.5*PIXEL_SIZE;
+		} 
+		SDL_RenderDrawRect(renderer, &musicSettingRect);
+		SDL_RenderFillRect(renderer, &musicSettingRect);
+		drawString(renderer, musicSetting, 3, 6, 9, 1, black);
+	}
+
+}
+
+void drawAllControls(SDL_Renderer* renderer) {
+	drawString(renderer, "controls", 8, 3, 13, 1, white);
+	drawString(renderer, "move      a / d", 15, 1.25, 15, 1, white);
+	drawString(renderer, "rotate    < / >", 15, 1.25, 16, 1, white);
+	drawString(renderer, "drop      space", 15, 1.25, 17, 1, white);
+	drawString(renderer, "pause     esc", 13, 1.25, 18, 1, white);
+}
+
+void drawSettingsMenu(SDL_Renderer* renderer, Settings* settings) {
+	int flashOn = 1;
 	clock_t lastUpdate = clock();
+	int focus = 0;
 
-	while (*playing) {
+	while (settings->appState == 1) {
 		SDL_Event event;
 		while (SDL_PollEvent(&event)) {
 			if (event.type == SDL_QUIT || event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE) {
-				*playing = -1;
+				settings->appState = -1;
+				return;
+			}
+			else if (event.type == SDL_KEYDOWN) {
+				switch (event.key.keysym.sym) {
+					case SDLK_RETURN: { settings->appState = 2; return; }
+					case SDLK_RIGHT: {
+						if (focus == 1) {
+							settings->musicOn = !settings->musicOn;
+						} else {
+							if (settings->startLevel < 15) settings->startLevel++;
+						}
+						break;
+					}
+					case SDLK_LEFT: {
+						if (focus == 1) {
+							settings->musicOn = !settings->musicOn;
+						}
+						else {
+							if (settings->startLevel > 1) settings->startLevel--;
+						}
+						break;
+					}
+					case SDLK_UP: {if (focus == 1) focus--; break;}
+					case SDLK_DOWN: {if (focus == 0) focus++; break;}
+				}
+			}
+		}
+		clock_t now = clock();
+		if ((double)(now - lastUpdate) / CLOCKS_PER_SEC >= 0.7) {
+			flashOn = !flashOn;
+			lastUpdate = now;
+		}
+
+		clear(renderer);
+		drawTitle(renderer);
+		drawAllSettings(renderer, settings, focus);
+		drawAllControls(renderer);
+
+		drawString(renderer, "press", 5, 2.25, 22.5, 1, white);
+		drawString(renderer, "to start", 8, 3, 23.5, 1, white);
+		if (flashOn) {
+			drawString(renderer, "enter", 5, 5.25, 22.5, 1, white);
+		}
+		SDL_RenderPresent(renderer);
+		SDL_Delay(50);
+	}
+}
+
+void displayTitleScreen(SDL_Renderer* renderer, Settings* settings) {
+	int flashOn = 1;
+	clock_t lastUpdate = clock();
+	while (settings->appState == 0) {
+		SDL_Event event;
+		while (SDL_PollEvent(&event)) {
+			if (event.type == SDL_QUIT || event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE) {
+				settings->appState = -1;
+				return;
+			} else if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_RETURN) {
+				settings->appState = 1;
+				return;
+			}
+		}
+		clock_t now = clock();
+		if ((double)(now - lastUpdate) / CLOCKS_PER_SEC >= 0.7) {
+			flashOn = !flashOn;
+			lastUpdate = now;
+		}
+
+		clear(renderer);
+		if (flashOn) {
+			drawPressEnterToStart(renderer);
+		}
+		drawTitle(renderer);
+		drawCredits(renderer);
+		SDL_RenderPresent(renderer);
+		SDL_Delay(50);
+	}
+}
+
+void displaySettingsMenu(SDL_Renderer* renderer, Settings* settings) {
+	clear(renderer);
+	drawSettingsMenu(renderer, settings);
+	SDL_RenderPresent(renderer);
+	SDL_Delay(50);
+}
+
+void gameLoop(SDL_Renderer* renderer, ColourScheme colours[], Settings* settings) {
+	Game* game = createGame(ROWS, COLS, settings->startLevel);
+	clock_t lastUpdate = clock();
+
+	while (settings->appState == 2) {
+		SDL_Event event;
+		while (SDL_PollEvent(&event)) {
+			if (event.type == SDL_QUIT || event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE) {
+				settings->appState = -1;
 				DeinitGameboard(&game->gameboard);
 				destroyGame(game);
 				return;
@@ -776,12 +867,12 @@ void gameLoop(SDL_Renderer* renderer, ColourScheme colours[], int* playing) {
 				case SDLK_RIGHT: { if (isValidMove(&game->currentShape, &game->gameboard, 'C')) {
 					game->currentShape.currentRotation = ((game->currentShape.currentRotation + 1) % NUM_ROTATIONS + NUM_ROTATIONS) % NUM_ROTATIONS;
 					break;
-				}
+					}
 				}
 				case SDLK_LEFT: { if (isValidMove(&game->currentShape, &game->gameboard, 'A')) {
 					game->currentShape.currentRotation = ((game->currentShape.currentRotation - 1) % NUM_ROTATIONS + NUM_ROTATIONS) % NUM_ROTATIONS;
 					break;
-				}
+					}
 				}
 				}
 			}
@@ -791,8 +882,9 @@ void gameLoop(SDL_Renderer* renderer, ColourScheme colours[], int* playing) {
 
 		if (!update(game, (double)(currentTime - lastUpdate) / CLOCKS_PER_SEC)) {
 			//end-game conditions met
+			settings->lastScore = game->score;
+			settings->appState = 3;
 			DeinitGameboard(&game->gameboard);
-			gameOverScreen(renderer, playing, game->score);
 			destroyGame(game);
 			SDL_Delay(500);
 			return;
@@ -807,29 +899,28 @@ void gameLoop(SDL_Renderer* renderer, ColourScheme colours[], int* playing) {
 	}
 }
 
-
-
 /* ~ ~ ~ ~ ~ ~ ~ ~ MAIN METHOD ~ ~ ~ ~ ~ ~ ~ ~ */
 
 int main(int argc, char* args[]) {
 	ColourScheme* colours = createColoursArray(NUM_COLOUR_SCHEMES, redScheme, greenScheme, blueScheme, whiteScheme, greyScheme);
-	
 	SDL_Renderer* renderer = initGraphicsAndGetRenderer();
+	Settings* settings = createSettings();
 	
-	int playing = 1;      //-1 --> exit,   0 --> in lobby,  1 --> in game
+    // app state 0 -> titleScreen, 1 -> settingsMenu,   2 -> playingGame,  3 -> gameOverScreen, -1 -> exit 
 
-	while (playing != -1) {
-		if (playing == 0) {
-			lobbyLoop(renderer);
-		} else if (playing == 1) {
-			srand(time(NULL));		//sets new seed for random number generator;
-			gameLoop(renderer, colours, &playing);
-			//gameOverScreen(renderer, &playing, 123456);
+	while (settings->appState > -1) {
+		switch (settings->appState) {
+			case 0: { displayTitleScreen(renderer, settings); break; }
+			case 1: { displaySettingsMenu(renderer, settings); break; }
+			case 2: { srand(time(NULL)); gameLoop(renderer, colours, settings); break; }
+			case 3: { gameOverScreen(renderer, settings); break; }
 		}
 	}
+
 	printf("\n\n\n~~~~~~~ G A M E   O V E R ~~~~~~~\n\n\n");
 	SDL_DestroyRenderer(renderer);
 	destroyColoursArray(colours);
+	destroySettings(settings);
 	SDL_Quit();
 	return 1;
 }

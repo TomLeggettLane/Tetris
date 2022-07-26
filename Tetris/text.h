@@ -1,5 +1,9 @@
+#pragma once
 #define numberBoxHeight 7
 #define numberBoxWidth 5
+#include "colours.h"
+#ifndef PIXEL_SIZE 20
+#endif
 
 SDL_Rect zero[7] = { {1, 0, 3, 1},
 					 {1, (numberBoxHeight - 1), 3,1},
@@ -105,11 +109,29 @@ SDL_Rect c[7] = {
 				{-1,-1,-1,-1},
 				{-1,-1,-1,-1}
 };
+SDL_Rect d[7] = {
+				{0, 0, 1, 7},
+				{ 0, 0, 3, 1 },
+				{ 0, 6, 3, 1 },
+				{3, 1, 1, 1},
+				{3, 5, 1, 1},
+				{4,2,1,3},
+				{-1,-1,-1,-1}
+};
 SDL_Rect e[7] = {
 					{0, 0, 1, 7},
 					{0, 0, 5, 1},
 					{0, 3, 4, 1},
 					{0, 6, 5, 1},
+					{-1,-1,-1,-1},
+					{-1,-1,-1,-1},
+					{-1,-1,-1,-1}
+};
+SDL_Rect f[7] = {
+					{0, 0, 5, 1},
+					{0, 0, 1, 7},
+					{0, 3, 4, 1},
+					{-1, -1, -1, -1},
 					{-1,-1,-1,-1},
 					{-1,-1,-1,-1},
 					{-1,-1,-1,-1}
@@ -121,6 +143,15 @@ SDL_Rect g[7] = {
 				{1, 6, 3, 1},
 				{4, 4, 1, 2},
 				{2, 3, 2, 1},
+				{-1,-1,-1,-1}
+};
+SDL_Rect h[7] = {
+				{0, 0, 1, 7},
+				{0, 3, 4, 1},
+				{4, 0, 1, 7},
+				{-1,-1,-1,-1},
+				{-1,-1,-1,-1},
+				{-1,-1,-1,-1},
 				{-1,-1,-1,-1}
 };
 SDL_Rect i[7] = {
@@ -221,6 +252,15 @@ SDL_Rect v[7] = {
 				{-1,-1,-1,-1},
 				{-1,-1,-1,-1}
 };
+SDL_Rect w[7] = {
+				{0, 0, 1, 7},
+				{4, 0, 1, 7},
+				{1, 5, 1, 1},
+				{3, 5, 1, 1},
+				{2, 4, 1, 1},
+				{-1,-1,-1,-1},
+				{-1,-1,-1,-1}
+};
 SDL_Rect y[7] = {
 				{0, 0, 1, 2},
 				{4, 0, 1, 2},
@@ -239,9 +279,35 @@ SDL_Rect heart[7] = {
 				{-1,-1,-1,-1},
 				{-1,-1,-1,-1}
 };
-
-SDL_Rect* text[37] = { zero,one,two,three,four,five,six,seven,eight,nine, 
-			a,b,c,NULL,e,NULL,g,NULL,i,NULL,NULL,l,m,n,o,p,NULL,r,s,t,u,v,NULL,NULL,y, NULL, heart };
+SDL_Rect slash[7] = {
+				{0, 5, 1, 2},
+				{1, 4, 1, 2},
+				{2, 3, 1, 2},
+				{3, 2, 1, 2},
+				{4, 1, 1, 2},
+				{-1,-1,-1,-1},
+				{-1,-1,-1,-1}
+};
+SDL_Rect leftArrow[7] = {
+				{3, 0, 1, 7},
+				{2, 1, 1, 5},
+				{1, 2, 1, 3},
+				{0, 3, 1, 1},
+				{-1,-1,-1,-1},
+				{-1,-1,-1,-1},
+				{-1,-1,-1,-1}
+};
+SDL_Rect rightArrow[7] = {
+				{0, 0, 1, 7},
+				{1, 1, 1, 5},
+				{2, 2, 1, 3},
+				{3, 3, 1, 1},
+				{-1,-1,-1,-1},
+				{-1,-1,-1,-1},
+				{-1,-1,-1,-1}
+};
+SDL_Rect* text[40] = { zero,one,two,three,four,five,six,seven,eight,nine, 
+			a,b,c,d,e,f,g,h,i,NULL,NULL,l,m,n,o,p,NULL,r,s,t,u,v,w,NULL,y, NULL, heart, slash, leftArrow, rightArrow };
 
 void setFontSize(int fontSize, int charToDraw) {
 	for (int i = 0; i < 7; i++) {
@@ -263,16 +329,24 @@ void unSetFontSize(int currentFontSize, int charToDraw) {
 	}
 }
 
-void drawText(SDL_Renderer* renderer, int screenX, int screenY, char charToDraw, int fontSize) {
-	SDL_SetRenderDrawColor(renderer, 255, 255, 255, SDL_ALPHA_OPAQUE);
+void drawText(SDL_Renderer* renderer, int screenX, int screenY, char charToDraw, int fontSize, Colour c) {
+	SDL_SetRenderDrawColor(renderer, c.r, c.g, c.b, SDL_ALPHA_OPAQUE);
 
 	if (charToDraw == ' ') return;
 	
 	int index = -1;
 	if (48 <= charToDraw && charToDraw <= 57) index = (int)charToDraw - 48;
 	else if (97 <= charToDraw && charToDraw <= 122) index = (int)charToDraw - 87;
-	else if (38 == charToDraw) index = 36;
-	if (index < 0 || index > 37) {
+	else {
+		switch (charToDraw) {
+			case 38: { index = 36; break; } 
+			case 47: { index = 37; break; }
+			case 60: { index = 38; break; }
+			case 62: { index = 39; break; }
+		}
+	}
+
+	if (index < 0 || index > 39) {
 		printf("Text Index Out of Bounds\n");
 		return;
 	}
@@ -291,4 +365,5 @@ void drawText(SDL_Renderer* renderer, int screenX, int screenY, char charToDraw,
 		unSetFontSize(fontSize, index);
 	}
 }
+
 
